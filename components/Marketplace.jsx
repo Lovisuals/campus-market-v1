@@ -69,7 +69,7 @@ export default function Marketplace() {
   const [activeCampus, setActiveCampus] = useState('All');
   const [showModal, setShowModal] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
-  const [showProModal, setShowProModal] = useState(false); // NEW: Pro Modal State
+  const [showProModal, setShowProModal] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [userLoc, setUserLoc] = useState(null);
@@ -88,7 +88,16 @@ export default function Marketplace() {
 
   useEffect(() => {
     fetchProducts();
-    checkTheme();
+    // THEME: Default to Light (White) Mode
+    const savedTheme = localStorage.getItem('sentinel_theme');
+    if (savedTheme === 'dark') {
+        setDarkMode(true);
+        document.body.classList.add('dark-mode');
+    } else {
+        setDarkMode(false);
+        document.body.classList.remove('dark-mode');
+    }
+    
     fetchForensics();
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
@@ -123,17 +132,16 @@ export default function Marketplace() {
     setLoading(false);
   };
 
-  const checkTheme = () => {
-      const isDark = localStorage.getItem('sentinel_theme') === 'dark';
-      setDarkMode(isDark);
-      if (isDark) document.body.classList.add('dark-mode');
-  };
-
   const toggleTheme = () => {
       const newMode = !darkMode;
       setDarkMode(newMode);
-      document.body.classList.toggle('dark-mode', newMode);
-      localStorage.setItem('sentinel_theme', newMode ? 'dark' : 'light');
+      if(newMode) {
+          document.body.classList.add('dark-mode');
+          localStorage.setItem('sentinel_theme', 'dark');
+      } else {
+          document.body.classList.remove('dark-mode');
+          localStorage.setItem('sentinel_theme', 'light');
+      }
   };
 
   // --- ACTIONS ---
@@ -141,7 +149,7 @@ export default function Marketplace() {
       holdTimer.current = setTimeout(() => {
           if (navigator.vibrate) navigator.vibrate(200);
           setShowLogin(true);
-      }, 2000); // Reduced to 2s for better feel
+      }, 2000);
   };
   const handleLogoTouchEnd = () => clearTimeout(holdTimer.current);
 
@@ -272,7 +280,7 @@ export default function Marketplace() {
             </div>
         </div>
 
-        {/* HEADER - NOW UNSELECTABLE */}
+        {/* HEADER */}
         <header className="sticky top-0 z-50 bg-[var(--wa-chat-bg)] border-b border-[var(--border)] pt-safe noselect">
             <div className="px-5 py-4 flex justify-between items-center">
                 <div 
@@ -290,7 +298,6 @@ export default function Marketplace() {
                     <button onClick={toggleTheme} className="w-10 h-10 flex items-center justify-center rounded-2xl bg-[var(--surface)] shadow-sm tap">
                         {darkMode ? '☀️' : '🌙'}
                     </button>
-                    {/* PRO BUTTON NOW WORKS */}
                     <button onClick={() => setShowProModal(true)} className="bg-[var(--wa-teal)] text-white px-5 py-2.5 rounded-2xl text-[10px] font-black shadow-lg tap">PRO</button>
                 </div>
             </div>
@@ -318,11 +325,28 @@ export default function Marketplace() {
 
                 return (
                     <div key={p.id} className={`product-card ${p.is_admin_post ? 'border-2 border-yellow-500' : ''}`}>
-                         <div className="h-40 bg-gray-200 relative">
-                            <img src={p.images?.[0] || "https://placehold.co/600x600/008069/white?text=No+Photo"} className="w-full h-full object-cover" />
-                            {p.images?.length > 1 && <div className="absolute top-2 right-2 bg-black/50 text-white text-[8px] font-bold px-2 py-1 rounded-full">+{p.images.length-1}</div>}
+                         {/* CAROUSEL / SWIPEABLE IMAGE AREA */}
+                         <div className="h-40 bg-gray-200 relative group overflow-hidden">
+                            <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-full h-full">
+                                {p.images && p.images.length > 0 ? p.images.map((img, idx) => (
+                                    <img key={idx} src={img} className="w-full h-full object-cover flex-shrink-0 snap-center" />
+                                )) : (
+                                    <img src="https://placehold.co/600x600/008069/white?text=No+Photo" className="w-full h-full object-cover flex-shrink-0 snap-center" />
+                                )}
+                            </div>
+                            
+                            {/* DOTS INDICATOR (Only if > 1 image) */}
+                            {p.images?.length > 1 && (
+                                <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+                                    {p.images.map((_, i) => (
+                                        <div key={i} className="w-1.5 h-1.5 rounded-full bg-white/80 shadow-sm border border-black/10"></div>
+                                    ))}
+                                </div>
+                            )}
+
                             {isSold && <div className="absolute inset-0 bg-black/60 flex items-center justify-center"><span className="text-white font-black border-2 px-2 py-1 -rotate-12">SOLD OUT</span></div>}
                         </div>
+
                         <div className="p-4 flex-1 flex flex-col justify-between">
                             <div>
                                 <h3 className="text-[11px] font-extrabold uppercase truncate opacity-70">{p.title}</h3>
@@ -363,6 +387,7 @@ export default function Marketplace() {
                         <input className="wa-input" placeholder="Title" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
                         <input className="wa-input" type="number" placeholder="Price (₦)" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required />
                         
+                        {/* 3 IMAGE UPLOAD */}
                         <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center relative tap">
                             <input type="file" accept="image/*" multiple onChange={handleImageSelect} className="absolute inset-0 opacity-0 w-full h-full" />
                             {previewUrls.length > 0 ? (
@@ -383,7 +408,7 @@ export default function Marketplace() {
             </div>
         )}
 
-        {/* NEW: PRO MODAL */}
+        {/* PRO MODAL */}
         {showProModal && (
             <div className="fixed inset-0 z-[140] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-fade-in">
                 <div className="glass-3d w-full max-w-sm p-8 text-center relative">
@@ -416,7 +441,7 @@ export default function Marketplace() {
             </div>
         )}
 
-        {/* LOGIN OVERLAY */}
+        {/* SOVEREIGN LOGIN */}
         {showLogin && (
             <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl">
                  <div className="glass-3d w-full max-w-sm p-8 border-t-4 border-[var(--wa-teal)]">
