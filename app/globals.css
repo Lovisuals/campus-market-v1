@@ -5,21 +5,24 @@
 @tailwind utilities;
 
 /* =========================================
-   1. GLOBAL VARIABLES
+   1. GLOBAL VARIABLES & THEME
    ========================================= */
 :root {
+  /* Brand Colors */
   --wa-teal: #008069;
   --wa-light: #25D366;
   --wa-dark: #075E54;
   --wa-neon: #25D366;
   
+  /* Surface & Text */
   --wa-surface: #ffffff;
   --wa-chat-bg: #ffffff;
   --wa-muted: #8696a0;
   --text-primary: #111b21;
-  --border: rgba(0, 0, 0, 0.1);
-  --surface: #f8f9fa; 
+  --border: rgba(0, 0, 0, 0.08);
+  --surface: #f0f2f5; 
 
+  /* Glass Effects */
   --glass-bg: rgba(255, 255, 255, 0.95);
   --glass-border: rgba(255, 255, 255, 0.8);
   --neo-shadow: 0 10px 30px -10px rgba(0, 128, 105, 0.3);
@@ -43,18 +46,56 @@
 }
 
 /* =========================================
-   2. BASE STYLES
+   2. APP FEEL & BEHAVIOR (CRITICAL FIXES)
    ========================================= */
+
+/* Prevent Double-Tap Zoom on Mobile */
+html {
+  touch-action: manipulation;
+}
+
+/* Base Body Styles */
 body {
   background-color: var(--wa-chat-bg);
   font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   color: var(--text-primary);
   transition: background-color 0.4s ease, color 0.4s ease;
+  -webkit-tap-highlight-color: transparent; /* Remove blue highlight on tap */
+}
+
+/* Prevent Text Selection (For Logo Long-Press) */
+.noselect {
+  -webkit-touch-callout: none; /* iOS Safari */
+  -webkit-user-select: none; /* Safari */
+  -khtml-user-select: none; /* Konqueror HTML */
+  -moz-user-select: none; /* Old Firefox */
+  -ms-user-select: none; /* Internet Explorer/Edge */
+  user-select: none;
+}
+
+/* Prevent Input Zoom on iOS (Forces 16px) */
+.wa-input {
+  font-size: 16px !important; 
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 14px 16px;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  width: 100%;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.wa-input:focus {
+  border-color: var(--wa-teal);
+  box-shadow: 0 0 0 3px rgba(0,128,105,0.1);
 }
 
 /* =========================================
-   3. UTILITIES & ANIMATIONS
+   3. COMPONENT STYLES
    ========================================= */
+
+/* Ticker Animation */
 .ticker-container {
   overflow: hidden;
   height: var(--ticker-height);
@@ -77,6 +118,7 @@ body {
   100% { transform: translateX(-100%); }
 }
 
+/* Search Bar */
 .search-container {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -92,6 +134,7 @@ body {
   box-shadow: 0 0 0 3px rgba(0, 128, 105, 0.1);
 }
 
+/* Feed Grid */
 #feed {
   display: grid;
   gap: 1.25rem;
@@ -103,6 +146,7 @@ body {
   #feed { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
+/* Product Card */
 .product-card {
   background: var(--wa-surface);
   border-radius: 28px;
@@ -116,6 +160,7 @@ body {
 
 .product-card:active { transform: scale(0.98); }
 
+/* Floating Action Button (FAB) */
 .fab {
   width: 64px;
   height: 64px;
@@ -133,23 +178,7 @@ body {
 
 .fab:active { transform: scale(0.9); }
 
-.wa-input {
-  background: var(--surface);
-  border-radius: 20px;
-  padding: 14px 16px;
-  font-size: 15px;
-  border: 1px solid transparent;
-  transition: all 0.2s ease;
-  width: 100%;
-  color: var(--text-primary);
-  outline: none;
-}
-
-.wa-input:focus {
-  border-color: var(--wa-teal);
-  box-shadow: 0 0 0 3px rgba(0,128,105,0.1);
-}
-
+/* Modals & Glass */
 .glass-3d {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -158,6 +187,7 @@ body {
   backdrop-filter: blur(12px);
 }
 
+/* Animations */
 .animate-slide-up {
   animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -167,7 +197,22 @@ body {
   to { transform: translateY(0); opacity: 1; }
 }
 
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Utilities */
 .tap:active { transform: scale(0.95); }
 
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Safe Area (iPhone Notch) */
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
