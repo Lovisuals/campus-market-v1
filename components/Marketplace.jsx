@@ -261,18 +261,43 @@ export default function Marketplace() {
       await supabase.from('broadcasts').delete().eq('id', id);
   };
 
-  // --- POSTING ---
+  // --- POSTING (Smart Version) ---
   const handlePost = async (e) => {
     e.preventDefault();
     setSubmitting(true);
+
+    // 1. Define the Phone Fixer inside here
+    const sanitizePhone = (input) => {
+        let clean = input.replace(/\D/g, ''); // Remove non-numbers
+        // Fix 080... to 23480...
+        if (clean.length === 11 && clean.startsWith('0')) {
+            clean = '234' + clean.substring(1);
+        }
+        // Check if valid Nigerian length (13 digits starting with 234)
+        if (clean.length !== 13 || !clean.startsWith('234')) {
+            throw new Error("Invalid Phone Number. Use format: 08012345678");
+        }
+        return clean;
+    };
     
     try {
+        // 2. Validate the Phone Number immediately
+        let finalPhone;
+        try {
+            finalPhone = sanitizePhone(form.whatsapp);
+        } catch (phoneErr) {
+            alert(phoneErr.message); 
+            setSubmitting(false); 
+            return; // Stop here if number is bad
+        }
+
+        // 3. Security Checks (Blacklist)
         const { data: banned } = await supabase.from('blacklist').select('ip_address').eq('ip_address', clientIp).maybeSingle();
         if(banned) { alert("Connection Refused."); setSubmitting(false); return; }
 
+        // 4. Daily Limit Check (Using the FIXED phone number)
         if (!isAdmin) {
-            const cleanPhone = form.whatsapp.replace(/\D/g, '');
-            const { data: proData } = await supabase.from('verified_sellers').select('limit_per_day').eq('phone', cleanPhone).maybeSingle();
+            const { data: proData } = await supabase.from('verified_sellers').select('limit_per_day').eq('phone', finalPhone).maybeSingle();
             const dailyLimit = proData ? proData.limit_per_day : 3;
             const today = new Date().toLocaleDateString();
             const quota = JSON.parse(localStorage.getItem('post_quota') || '{}');
@@ -281,6 +306,7 @@ export default function Marketplace() {
             }
         }
 
+        // 5. Image Upload
         let finalImageUrls = [];
         if (imageFiles.length > 0) {
             setUploadStatus('Uploading...');
@@ -295,12 +321,13 @@ export default function Marketplace() {
             }
         }
 
+        // 6. Save to Database (With FIXED phone number)
         setUploadStatus('Publishing...');
         if (postType === 'sell') {
             const { error } = await supabase.from('products').insert([{
                 title: form.title,
                 price: form.price,
-                whatsapp_number: form.whatsapp.replace(/\D/g, ''),
+                whatsapp_number: finalPhone, // <--- Using the clean 234 number
                 campus: form.campus,
                 item_type: form.type,
                 images: finalImageUrls.length > 0 ? finalImageUrls : ["https://placehold.co/600x600/008069/white?text=No+Photo"],
@@ -314,7 +341,7 @@ export default function Marketplace() {
             const { error } = await supabase.from('requests').insert([{
                 title: form.title,
                 budget: form.price, 
-                whatsapp_number: form.whatsapp.replace(/\D/g, ''),
+                whatsapp_number: finalPhone, // <--- Using the clean 234 number
                 campus: form.campus,
                 image_url: finalImageUrls[0] || null, 
                 ip_address: clientIp,
@@ -323,6 +350,7 @@ export default function Marketplace() {
             if (error) throw error;
         }
 
+        // 7. Cleanup
         const today = new Date().toLocaleDateString();
         const currentQuota = JSON.parse(localStorage.getItem('post_quota') || '{}');
         const newCount = (currentQuota.date === today ? currentQuota.count : 0) + 1;
