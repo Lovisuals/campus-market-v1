@@ -69,11 +69,15 @@ export default function Marketplace() {
   const [showModal, setShowModal] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
-  const [showAdminPanel, setShowAdminPanel] = useState(false); // NEW: Admin Panel
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [userLoc, setUserLoc] = useState(null);
+  
+  // NEW: Broadcast State
   const [tickerMsg, setTickerMsg] = useState('');
+  const [broadcasts, setBroadcasts] = useState([]); // All broadcasts (Active & Inactive)
+  
   const [clientIp, setClientIp] = useState('0.0.0.0');
   
   // Form State
@@ -88,7 +92,8 @@ export default function Marketplace() {
 
   useEffect(() => {
     fetchProducts();
-    
+    fetchBroadcasts(); // NEW: Fetch the list
+
     // Theme
     const savedTheme = localStorage.getItem('sentinel_theme');
     if (savedTheme === 'dark') {
@@ -96,10 +101,8 @@ export default function Marketplace() {
         document.body.classList.add('dark-mode');
     }
 
-    // Forensics
     fetch('https://api.ipify.org?format=json').then(res => res.json()).then(data => setClientIp(data.ip)).catch(() => {});
     
-    // Geolocation
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
@@ -107,19 +110,16 @@ export default function Marketplace() {
     }
 
     checkAdminSession();
-    fetchTicker();
 
-    // REALTIME LISTENER
+    // REALTIME LISTENER (Products + Broadcasts)
     const channel = supabase.channel('realtime_feed')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
-        if(payload.eventType === 'INSERT') {
-            setProducts(prev => [payload.new, ...prev]);
-            // Flash effect for new items could be added here
-        } else if (payload.eventType === 'DELETE') {
-            setProducts(prev => prev.filter(p => p.id !== payload.old.id));
-        } else if (payload.eventType === 'UPDATE') {
-             setProducts(prev => prev.map(p => p.id === payload.new.id ? payload.new : p));
-        }
+        if(payload.eventType === 'INSERT') setProducts(prev => [payload.new, ...prev]);
+        else if (payload.eventType === 'DELETE') setProducts(prev => prev.filter(p => p.id !== payload.old.id));
+        else if (payload.eventType === 'UPDATE') setProducts(prev => prev.map(p => p.id === payload.new.id ? payload.new : p));
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'broadcasts' }, () => {
+        fetchBroadcasts(); // Refresh ticker when admin toggles something
     })
     .subscribe();
 
@@ -132,9 +132,15 @@ export default function Marketplace() {
       if (session) setIsAdmin(true);
   };
 
-  const fetchTicker = async () => {
-      const { data } = await supabase.from('admin_settings').select('value').eq('key', 'global_alert').maybeSingle();
-      if(data) setTickerMsg(data.value);
+  const fetchBroadcasts = async () => {
+      // Admins see all, Public sees only active (handled by RLS automatically if configured, but we filter on frontend for display logic)
+      const { data } = await supabase.from('broadcasts').select('*').order('created_at', { ascending: false });
+      if(data) {
+          setBroadcasts(data);
+          // Stitch active messages for the ticker
+          const activeMsgs = data.filter(b => b.is_active).map(b => b.message).join(' • ');
+          setTickerMsg(activeMsgs || "CAMPUS MARKETPLACE");
+      }
   }
 
   const fetchProducts = async () => {
@@ -173,7 +179,7 @@ export default function Marketplace() {
       if (!error) {
           setIsAdmin(true);
           setShowLogin(false);
-          setShowAdminPanel(true); // Open panel immediately
+          setShowAdminPanel(true);
       } else {
           alert("Access Denied: " + error.message);
       }
@@ -188,26 +194,32 @@ export default function Marketplace() {
 
   const handleExpunge = async (id) => {
       if(!confirm("PERMANENTLY DELETE?")) return;
-      const { error } = await supabase.from('products').delete().eq('id', id);
-      if(error) alert("Failed: " + error.message);
-      // Realtime will handle the UI update
+      await supabase.from('products').delete().eq('id', id);
   };
 
   const handleBanIP = async (ip) => {
       if(!confirm(`BAN IP ${ip} PERMANENTLY?`)) return;
-      const { error } = await supabase.from('blacklist').insert([{ ip_address: ip, reason: 'Admin Ban' }]);
-      if(error) alert("Ban Failed: " + error.message);
-      else alert("Target Neutralized.");
+      await supabase.from('blacklist').insert([{ ip_address: ip, reason: 'Admin Ban' }]);
+      alert("Target Neutralized.");
   };
 
-  const handleUpdateTicker = async (e) => {
+  // --- BROADCAST MANAGER ---
+  const handleAddBroadcast = async (e) => {
       e.preventDefault();
-      const val = e.target.ticker.value;
-      const { error } = await supabase.from('admin_settings').upsert({ key: 'global_alert', value: val });
-      if(!error) {
-          setTickerMsg(val);
-          alert("Broadcast Updated");
-      }
+      const msg = e.target.message.value;
+      if(!msg) return;
+      const { error } = await supabase.from('broadcasts').insert([{ message: msg, is_active: true }]);
+      if(error) alert("Error: " + error.message);
+      e.target.reset();
+  };
+
+  const toggleBroadcast = async (id, currentStatus) => {
+      await supabase.from('broadcasts').update({ is_active: !currentStatus }).eq('id', id);
+  };
+
+  const deleteBroadcast = async (id) => {
+      if(!confirm("Delete this broadcast?")) return;
+      await supabase.from('broadcasts').delete().eq('id', id);
   };
 
   // --- POSTING ---
@@ -216,15 +228,13 @@ export default function Marketplace() {
     setSubmitting(true);
     
     try {
-        // 0. CHECK BLACKLIST
         const { data: banned } = await supabase.from('blacklist').select('ip_address').eq('ip_address', clientIp).maybeSingle();
         if(banned) {
-            alert("Connection Refused: You are blacklisted.");
+            alert("Connection Refused.");
             setSubmitting(false);
             return;
         }
 
-        // 1. QUOTA CHECK
         if (!isAdmin) {
             const cleanPhone = form.whatsapp.replace(/\D/g, '');
             const { data: proData } = await supabase.from('verified_sellers').select('limit_per_day').eq('phone', cleanPhone).maybeSingle();
@@ -270,7 +280,6 @@ export default function Marketplace() {
 
         if (error) throw error;
 
-        // Update Local Quota
         const today = new Date().toLocaleDateString();
         const currentQuota = JSON.parse(localStorage.getItem('post_quota') || '{}');
         const newCount = (currentQuota.date === today ? currentQuota.count : 0) + 1;
@@ -383,6 +392,7 @@ export default function Marketplace() {
 
                 return (
                     <div key={p.id} className={`product-card ${p.is_admin_post ? 'border-2 border-yellow-500' : ''}`}>
+                         {/* CAROUSEL */}
                          <div className="h-40 bg-gray-200 relative group overflow-hidden">
                             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-full h-full">
                                 {p.images && p.images.length > 0 ? p.images.map((img, idx) => (
@@ -423,29 +433,48 @@ export default function Marketplace() {
 
         <button onClick={() => setShowModal(true)} className="fixed bottom-8 right-6 fab z-50 tap">+</button>
 
-        {/* ADMIN COMMAND CENTER */}
+        {/* SOVEREIGN COMMAND PANEL (The Update) */}
         {showAdminPanel && (
             <div className="fixed inset-0 z-[200] bg-white dark:bg-black overflow-y-auto">
                 <div className="p-6">
                     <div className="flex justify-between items-center mb-8">
-                        <h2 className="text-2xl font-black uppercase text-[var(--wa-teal)]">Sovereign Command</h2>
-                        <button onClick={() => setShowAdminPanel(false)} className="text-sm font-bold opacity-50">CLOSE</button>
+                        <h2 className="text-xl font-black uppercase text-[var(--wa-teal)]">Command Center</h2>
+                        <button onClick={() => setShowAdminPanel(false)} className="text-xs font-bold opacity-50 bg-gray-100 px-3 py-1 rounded-lg">CLOSE</button>
                     </div>
 
                     <div className="space-y-8">
-                        {/* 1. Global Ticker */}
-                        <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-3xl">
-                            <h3 className="text-xs font-black uppercase text-gray-400 mb-4">Broadcast System</h3>
-                            <form onSubmit={handleUpdateTicker} className="flex gap-2">
-                                <input name="ticker" className="wa-input" defaultValue={tickerMsg} placeholder="Enter broadcast message..." />
-                                <button className="bg-black text-white px-6 rounded-xl font-bold text-xs">PUSH</button>
+                        {/* 1. BROADCAST MANAGER */}
+                        <div className="bg-gray-50 dark:bg-gray-900 p-5 rounded-3xl">
+                            <h3 className="text-xs font-black uppercase text-gray-400 mb-4">📢 Active Broadcasts</h3>
+                            
+                            {/* List of Broadcasts */}
+                            <div className="space-y-3 mb-4">
+                                {broadcasts.map(b => (
+                                    <div key={b.id} className="flex items-center justify-between bg-white dark:bg-black p-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
+                                        <span className={`text-xs font-bold ${!b.is_active && 'opacity-30 line-through'}`}>{b.message}</span>
+                                        <div className="flex items-center gap-2">
+                                            {/* EYE TOGGLE */}
+                                            <button onClick={() => toggleBroadcast(b.id, b.is_active)} className="text-xl tap">
+                                                {b.is_active ? '👁️' : '🚫'}
+                                            </button>
+                                            {/* TRASH */}
+                                            <button onClick={() => deleteBroadcast(b.id)} className="text-xl opacity-30 hover:opacity-100 tap">🗑️</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Add New Broadcast */}
+                            <form onSubmit={handleAddBroadcast} className="flex gap-2">
+                                <input name="message" className="wa-input" placeholder="New Alert (e.g. Promo)" required />
+                                <button className="bg-black text-white px-4 rounded-xl font-bold text-xs">ADD</button>
                             </form>
                         </div>
 
                         {/* 2. Stats */}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-3xl">
-                                <h3 className="text-[10px] font-black uppercase text-gray-400">Total Posts</h3>
+                                <h3 className="text-[10px] font-black uppercase text-gray-400">Total</h3>
                                 <p className="text-4xl font-black text-[var(--wa-teal)] mt-2">{products.length}</p>
                             </div>
                             <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl">
@@ -461,7 +490,7 @@ export default function Marketplace() {
             </div>
         )}
 
-        {/* ... SELL MODAL, PRO MODAL, LOGIN MODAL (Same as before) ... */}
+        {/* ... MODALS ... */}
         {showModal && (
             <div className="fixed inset-0 bg-black/60 z-[100] flex items-end backdrop-blur-sm">
                 <div className="glass-3d w-full p-6 rounded-t-[32px] animate-slide-up max-h-[85vh] overflow-y-auto">
