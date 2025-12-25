@@ -261,41 +261,58 @@ export default function Marketplace() {
       await supabase.from('broadcasts').delete().eq('id', id);
   };
 
-  // --- POSTING (Smart Version) ---
+    // --- POSTING (V2: Aggressive Sanitizer) ---
   const handlePost = async (e) => {
     e.preventDefault();
     setSubmitting(true);
 
-    // 1. Define the Phone Fixer inside here
+    // 1. THE ULTIMATE PHONE FIXER
     const sanitizePhone = (input) => {
-        let clean = input.replace(/\D/g, ''); // Remove non-numbers
-        // Fix 080... to 23480...
+        // Remove PLUS, SPACES, DASHES immediately.
+        // "+234 070-123" becomes "234070123"
+        let clean = input.replace(/\D/g, ''); 
+
+        // CASE A: User typed "2340..." (Common mistake: Country code + 0)
+        if (clean.startsWith('2340')) {
+            clean = '234' + clean.substring(4);
+        }
+
+        // CASE B: User typed "080..." or "070..." (Standard Local)
         if (clean.length === 11 && clean.startsWith('0')) {
             clean = '234' + clean.substring(1);
         }
-        // Check if valid Nigerian length (13 digits starting with 234)
-        if (clean.length !== 13 || !clean.startsWith('234')) {
-            throw new Error("Invalid Phone Number. Use format: 08012345678");
+
+        // CASE C: User typed "80..." or "70..." (Missing leading zero)
+        if (clean.length === 10 && (clean.startsWith('8') || clean.startsWith('7') || clean.startsWith('9'))) {
+             clean = '234' + clean;
         }
+
+        // Final Check: Must be 13 digits and start with 234
+        if (clean.length !== 13 || !clean.startsWith('234')) {
+            throw new Error(`Invalid Phone Number (${input}). Please check and try again.`);
+        }
+        
         return clean;
     };
     
     try {
-        // 2. Validate the Phone Number immediately
+        // 2. RUN THE FIXER
         let finalPhone;
         try {
             finalPhone = sanitizePhone(form.whatsapp);
+            // DEBUG: Show the user what the system sees (Optional, good for trust)
+            // console.log("System formatted phone to:", finalPhone);
         } catch (phoneErr) {
             alert(phoneErr.message); 
             setSubmitting(false); 
-            return; // Stop here if number is bad
+            return; 
         }
 
-        // 3. Security Checks (Blacklist)
+        // 3. BLACKLIST CHECK
         const { data: banned } = await supabase.from('blacklist').select('ip_address').eq('ip_address', clientIp).maybeSingle();
         if(banned) { alert("Connection Refused."); setSubmitting(false); return; }
 
-        // 4. Daily Limit Check (Using the FIXED phone number)
+        // 4. DAILY LIMIT CHECK (Using FIXED number)
         if (!isAdmin) {
             const { data: proData } = await supabase.from('verified_sellers').select('limit_per_day').eq('phone', finalPhone).maybeSingle();
             const dailyLimit = proData ? proData.limit_per_day : 3;
@@ -306,7 +323,7 @@ export default function Marketplace() {
             }
         }
 
-        // 5. Image Upload
+        // 5. IMAGE UPLOAD
         let finalImageUrls = [];
         if (imageFiles.length > 0) {
             setUploadStatus('Uploading...');
@@ -321,13 +338,13 @@ export default function Marketplace() {
             }
         }
 
-        // 6. Save to Database (With FIXED phone number)
+        // 6. DB INSERT (Using finalPhone)
         setUploadStatus('Publishing...');
         if (postType === 'sell') {
             const { error } = await supabase.from('products').insert([{
                 title: form.title,
                 price: form.price,
-                whatsapp_number: finalPhone, // <--- Using the clean 234 number
+                whatsapp_number: finalPhone, // <--- GUARANTEED 234 FORMAT
                 campus: form.campus,
                 item_type: form.type,
                 images: finalImageUrls.length > 0 ? finalImageUrls : ["https://placehold.co/600x600/008069/white?text=No+Photo"],
@@ -341,7 +358,7 @@ export default function Marketplace() {
             const { error } = await supabase.from('requests').insert([{
                 title: form.title,
                 budget: form.price, 
-                whatsapp_number: finalPhone, // <--- Using the clean 234 number
+                whatsapp_number: finalPhone, // <--- GUARANTEED 234 FORMAT
                 campus: form.campus,
                 image_url: finalImageUrls[0] || null, 
                 ip_address: clientIp,
@@ -350,7 +367,7 @@ export default function Marketplace() {
             if (error) throw error;
         }
 
-        // 7. Cleanup
+        // 7. CLEANUP
         const today = new Date().toLocaleDateString();
         const currentQuota = JSON.parse(localStorage.getItem('post_quota') || '{}');
         const newCount = (currentQuota.date === today ? currentQuota.count : 0) + 1;
@@ -371,6 +388,7 @@ export default function Marketplace() {
         setUploadStatus('');
     }
   };
+
 
   const handleImageSelect = (e) => {
       const files = Array.from(e.target.files).slice(0, 3);
