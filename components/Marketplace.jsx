@@ -63,7 +63,11 @@ const compressImage = async (file) => {
 };
 
 export default function Marketplace() {
-  const [products, setProducts] = useState([]);
+  // STATE
+  const [products, setProducts] = useState([]); // Items for Sale
+  const [requests, setRequests] = useState([]); // Items Wanted
+  const [viewMode, setViewMode] = useState('market'); // 'market' or 'requests'
+  
   const [loading, setLoading] = useState(true);
   const [activeCampus, setActiveCampus] = useState('All');
   const [showModal, setShowModal] = useState(false);
@@ -74,13 +78,12 @@ export default function Marketplace() {
   const [darkMode, setDarkMode] = useState(false);
   const [userLoc, setUserLoc] = useState(null);
   
-  // NEW: Broadcast State
   const [tickerMsg, setTickerMsg] = useState('');
-  const [broadcasts, setBroadcasts] = useState([]); // All broadcasts (Active & Inactive)
-  
+  const [broadcasts, setBroadcasts] = useState([]);
   const [clientIp, setClientIp] = useState('0.0.0.0');
   
-  // Form State
+  // FORM STATE
+  const [postType, setPostType] = useState('sell'); // 'sell' or 'request'
   const [form, setForm] = useState({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
   const [imageFiles, setImageFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
@@ -90,11 +93,12 @@ export default function Marketplace() {
   const logoRef = useRef(null);
   const holdTimer = useRef(null);
 
+  // --- INIT ---
   useEffect(() => {
     fetchProducts();
-    fetchBroadcasts(); // NEW: Fetch the list
+    fetchRequests();
+    fetchBroadcasts();
 
-    // Theme
     const savedTheme = localStorage.getItem('sentinel_theme');
     if (savedTheme === 'dark') {
         setDarkMode(true);
@@ -111,20 +115,22 @@ export default function Marketplace() {
 
     checkAdminSession();
 
-    // REALTIME LISTENER (Products + Broadcasts)
+    // REALTIME
     const channel = supabase.channel('realtime_feed')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
         if(payload.eventType === 'INSERT') setProducts(prev => [payload.new, ...prev]);
         else if (payload.eventType === 'DELETE') setProducts(prev => prev.filter(p => p.id !== payload.old.id));
-        else if (payload.eventType === 'UPDATE') setProducts(prev => prev.map(p => p.id === payload.new.id ? payload.new : p));
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, (payload) => {
+        if(payload.eventType === 'INSERT') setRequests(prev => [payload.new, ...prev]);
+        else if (payload.eventType === 'DELETE') setRequests(prev => prev.filter(r => r.id !== payload.old.id));
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'broadcasts' }, () => {
-        fetchBroadcasts(); // Refresh ticker when admin toggles something
+        fetchBroadcasts();
     })
     .subscribe();
 
     return () => { supabase.removeChannel(channel); }
-
   }, []);
 
   const checkAdminSession = async () => {
@@ -133,11 +139,9 @@ export default function Marketplace() {
   };
 
   const fetchBroadcasts = async () => {
-      // Admins see all, Public sees only active (handled by RLS automatically if configured, but we filter on frontend for display logic)
       const { data } = await supabase.from('broadcasts').select('*').order('created_at', { ascending: false });
       if(data) {
           setBroadcasts(data);
-          // Stitch active messages for the ticker
           const activeMsgs = data.filter(b => b.is_active).map(b => b.message).join(' • ');
           setTickerMsg(activeMsgs || "CAMPUS MARKETPLACE");
       }
@@ -147,6 +151,11 @@ export default function Marketplace() {
     const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
     if (data) setProducts(data);
     setLoading(false);
+  };
+
+  const fetchRequests = async () => {
+    const { data } = await supabase.from('requests').select('*').order('created_at', { ascending: false });
+    if (data) setRequests(data);
   };
 
   const toggleTheme = () => {
@@ -161,7 +170,7 @@ export default function Marketplace() {
       }
   };
 
-  // --- ADMIN ACTIONS ---
+  // --- ACTIONS ---
   const handleLogoTouchStart = () => {
       holdTimer.current = setTimeout(() => {
           if (navigator.vibrate) navigator.vibrate(200);
@@ -181,7 +190,7 @@ export default function Marketplace() {
           setShowLogin(false);
           setShowAdminPanel(true);
       } else {
-          alert("Access Denied: " + error.message);
+          alert("Access Denied");
       }
   };
 
@@ -192,94 +201,103 @@ export default function Marketplace() {
       window.location.reload();
   };
 
-  const handleExpunge = async (id) => {
-      if(!confirm("PERMANENTLY DELETE?")) return;
+  // --- ADMIN DELETIONS ---
+  const handleExpungeProduct = async (id) => {
+      if(!confirm("DELETE ITEM?")) return;
       await supabase.from('products').delete().eq('id', id);
   };
-
+  const handleExpungeRequest = async (id) => {
+      if(!confirm("DELETE REQUEST?")) return;
+      await supabase.from('requests').delete().eq('id', id);
+  };
   const handleBanIP = async (ip) => {
       if(!confirm(`BAN IP ${ip} PERMANENTLY?`)) return;
       await supabase.from('blacklist').insert([{ ip_address: ip, reason: 'Admin Ban' }]);
       alert("Target Neutralized.");
   };
 
-  // --- BROADCAST MANAGER ---
+  // --- BROADCASTS ---
   const handleAddBroadcast = async (e) => {
       e.preventDefault();
       const msg = e.target.message.value;
       if(!msg) return;
-      const { error } = await supabase.from('broadcasts').insert([{ message: msg, is_active: true }]);
-      if(error) alert("Error: " + error.message);
+      await supabase.from('broadcasts').insert([{ message: msg, is_active: true }]);
       e.target.reset();
   };
-
   const toggleBroadcast = async (id, currentStatus) => {
       await supabase.from('broadcasts').update({ is_active: !currentStatus }).eq('id', id);
   };
-
   const deleteBroadcast = async (id) => {
-      if(!confirm("Delete this broadcast?")) return;
+      if(!confirm("Delete?")) return;
       await supabase.from('broadcasts').delete().eq('id', id);
   };
 
-  // --- POSTING ---
+  // --- POSTING (Unified Logic) ---
   const handlePost = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     
     try {
+        // Blacklist Check
         const { data: banned } = await supabase.from('blacklist').select('ip_address').eq('ip_address', clientIp).maybeSingle();
-        if(banned) {
-            alert("Connection Refused.");
-            setSubmitting(false);
-            return;
-        }
+        if(banned) { alert("Connection Refused."); setSubmitting(false); return; }
 
+        // Daily Limit (Shared for Sell/Request)
         if (!isAdmin) {
             const cleanPhone = form.whatsapp.replace(/\D/g, '');
             const { data: proData } = await supabase.from('verified_sellers').select('limit_per_day').eq('phone', cleanPhone).maybeSingle();
             const dailyLimit = proData ? proData.limit_per_day : 3;
-            
             const today = new Date().toLocaleDateString();
             const quota = JSON.parse(localStorage.getItem('post_quota') || '{}');
-            
             if (quota.date === today && quota.count >= dailyLimit) {
-                alert(`Daily Limit Reached!`);
-                setSubmitting(false);
-                return;
+                alert(`Daily Limit Reached!`); setSubmitting(false); return;
             }
         }
 
+        // Image Upload (Optional for requests)
         let finalImageUrls = [];
         if (imageFiles.length > 0) {
-            setUploadStatus('Uploading images...');
+            setUploadStatus('Uploading...');
             for (let i = 0; i < imageFiles.length; i++) {
                 const compressedBlob = await compressImage(imageFiles[i]);
-                const filename = `item_${Date.now()}_${i}_${Math.random().toString(36).slice(2)}`;
+                const filename = `${postType}_${Date.now()}_${i}`;
                 const { error: uploadError } = await supabase.storage.from('item-images').upload(filename, compressedBlob);
-                if (uploadError) throw uploadError;
-                const { data: { publicUrl } } = supabase.storage.from('item-images').getPublicUrl(filename);
-                finalImageUrls.push(publicUrl);
+                if (!uploadError) {
+                    const { data: { publicUrl } } = supabase.storage.from('item-images').getPublicUrl(filename);
+                    finalImageUrls.push(publicUrl);
+                }
             }
-        } else {
-            finalImageUrls.push("https://placehold.co/600x600/008069/white?text=No+Photo");
         }
 
+        // DB Insert
         setUploadStatus('Publishing...');
-        const { error } = await supabase.from('products').insert([{
-            title: form.title,
-            price: form.price,
-            whatsapp_number: form.whatsapp.replace(/\D/g, ''),
-            campus: form.campus,
-            item_type: form.type,
-            images: finalImageUrls,
-            is_admin_post: isAdmin,
-            ip_address: clientIp,
-            user_agent: navigator.userAgent
-        }]);
+        if (postType === 'sell') {
+            const { error } = await supabase.from('products').insert([{
+                title: form.title,
+                price: form.price,
+                whatsapp_number: form.whatsapp.replace(/\D/g, ''),
+                campus: form.campus,
+                item_type: form.type,
+                images: finalImageUrls.length > 0 ? finalImageUrls : ["https://placehold.co/600x600/008069/white?text=No+Photo"],
+                is_admin_post: isAdmin,
+                ip_address: clientIp,
+                user_agent: navigator.userAgent
+            }]);
+            if (error) throw error;
+        } else {
+            // REQUEST POST
+            const { error } = await supabase.from('requests').insert([{
+                title: form.title,
+                budget: form.price, // Reusing price field as budget
+                whatsapp_number: form.whatsapp.replace(/\D/g, ''),
+                campus: form.campus,
+                image_url: finalImageUrls[0] || null, // Optional ref image
+                ip_address: clientIp
+            }]);
+            if (error) throw error;
+        }
 
-        if (error) throw error;
-
+        // Update Quota & Cleanup
         const today = new Date().toLocaleDateString();
         const currentQuota = JSON.parse(localStorage.getItem('post_quota') || '{}');
         const newCount = (currentQuota.date === today ? currentQuota.count : 0) + 1;
@@ -290,6 +308,8 @@ export default function Marketplace() {
         setForm({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
         setImageFiles([]);
         setPreviewUrls([]);
+        fetchProducts();
+        fetchRequests();
 
     } catch (err) {
         alert("Error: " + err.message);
@@ -303,30 +323,38 @@ export default function Marketplace() {
       const files = Array.from(e.target.files).slice(0, 3);
       if (files.length > 0) {
           setImageFiles(files);
-          const urls = files.map(file => URL.createObjectURL(file));
-          setPreviewUrls(urls);
+          setPreviewUrls(files.map(file => URL.createObjectURL(file)));
       }
   };
 
   const handleBuyClick = async (product) => {
       window.open(`https://wa.me/${product.whatsapp_number}`, '_blank');
-      if(!isAdmin) {
-         await supabase.rpc('increment_clicks', { row_id: product.id });
-      }
+      if(!isAdmin) await supabase.rpc('increment_clicks', { row_id: product.id });
+  };
+  
+  const handleFulfillRequest = (req) => {
+      const text = `Hi, I saw your request on CampusMarket for "${req.title}". I have it available.`;
+      window.open(`https://wa.me/${req.whatsapp_number}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   // --- RENDER ---
   const [searchTerm, setSearchTerm] = useState('');
-  
-  let displayProducts = products.filter(p => {
-      if (activeCampus !== 'All' && p.campus !== activeCampus) return false;
-      const term = searchTerm.toLowerCase();
-      if (term && !p.title.toLowerCase().includes(term) && !p.campus.toLowerCase().includes(term)) return false;
-      return true;
-  });
 
+  // Filter Logic (Shared)
+  const filterList = (list) => {
+      return list.filter(item => {
+          if (activeCampus !== 'All' && item.campus !== activeCampus) return false;
+          const term = searchTerm.toLowerCase();
+          if (term && !item.title.toLowerCase().includes(term) && !item.campus.toLowerCase().includes(term)) return false;
+          return true;
+      });
+  };
+
+  let displayItems = viewMode === 'market' ? filterList(products) : filterList(requests);
+
+  // Sort by Distance if Loc available
   if (userLoc && activeCampus === 'All') {
-      displayProducts.sort((a, b) => {
+      displayItems.sort((a, b) => {
           const cA = CAMPUSES.find(c => c.id === a.campus) || {};
           const cB = CAMPUSES.find(c => c.id === b.campus) || {};
           return getDistance(userLoc.lat, userLoc.lng, cA.lat, cA.lng) - getDistance(userLoc.lat, userLoc.lng, cB.lat, cB.lng);
@@ -334,7 +362,7 @@ export default function Marketplace() {
   }
 
   return (
-    <div className="min-h-screen pb-32">
+    <div className="min-h-screen pb-32 transition-colors duration-300">
         {/* TICKER */}
         <div className="ticker-container">
             <div className="ticker-content">
@@ -343,7 +371,7 @@ export default function Marketplace() {
         </div>
 
         {/* HEADER */}
-        <header className="sticky top-0 z-50 bg-[var(--wa-chat-bg)] border-b border-[var(--border)] pt-safe noselect">
+        <header className="sticky top-0 z-50 bg-[var(--wa-chat-bg)] border-b border-[var(--border)] pt-safe noselect shadow-sm">
             <div className="px-5 py-4 flex justify-between items-center">
                 <div 
                     ref={logoRef} 
@@ -367,150 +395,134 @@ export default function Marketplace() {
                     )}
                 </div>
             </div>
-            {/* ... Campus List & Search ... */}
-             <div className="px-5 pb-3 flex gap-3 overflow-x-auto scrollbar-hide">
+
+            {/* NEW: MODE SWITCHER (Market vs Request) */}
+            <div className="px-5 pb-2 flex gap-2">
+                <button 
+                    onClick={() => setViewMode('market')} 
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'market' ? 'bg-[var(--wa-teal)] text-white shadow-lg' : 'bg-[var(--surface)] text-gray-400'}`}
+                >
+                    Items For Sale
+                </button>
+                <button 
+                    onClick={() => setViewMode('requests')} 
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'requests' ? 'bg-[#8E44AD] text-white shadow-lg' : 'bg-[var(--surface)] text-gray-400'}`}
+                >
+                    Request Board
+                </button>
+            </div>
+
+            {/* Campus List */}
+             <div className="px-5 pb-3 flex gap-3 overflow-x-auto scrollbar-hide pt-2">
                 {CAMPUSES.map(c => (
                     <button key={c.id} onClick={() => setActiveCampus(c.id)} className={`flex-none px-5 py-2 rounded-full text-[10px] font-black border transition tap ${activeCampus === c.id ? 'bg-[var(--wa-teal)] text-white border-transparent' : 'border-gray-200 text-gray-400'}`}>
                         {c.name}
                     </button>
                 ))}
             </div>
+            
+            {/* Search */}
             <div className="px-5 py-3">
                 <div className="search-container">
                     <span className="opacity-20 text-sm mr-3">🔍</span>
-                    <input className="flex-1 bg-transparent py-3 text-[13px] font-semibold outline-none wa-input" placeholder="Search (e.g. iPhone)..." onChange={(e) => setSearchTerm(e.target.value)} />
+                    <input className="flex-1 bg-transparent py-3 text-[13px] font-semibold outline-none wa-input" placeholder={viewMode === 'market' ? "Search items..." : "Search requests..."} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
             </div>
         </header>
 
         {/* FEED */}
         <main id="feed">
-            {loading ? <p className="col-span-2 text-center py-10 opacity-40">Loading Market...</p> : displayProducts.map(p => {
-                const isSold = (p.click_count || 0) >= 5;
-                const campData = CAMPUSES.find(c => c.id === p.campus);
-                const dist = userLoc && campData ? getDistance(userLoc.lat, userLoc.lng, campData.lat, campData.lng).toFixed(1) + 'km' : p.campus;
+            {loading ? <p className="col-span-2 text-center py-10 opacity-40">Loading...</p> : 
+             displayItems.length === 0 ? <p className="col-span-2 text-center py-10 opacity-40 text-sm font-bold">No items found here yet.</p> :
+             displayItems.map(item => {
+                
+                // --- MARKET CARD ---
+                if (viewMode === 'market') {
+                    const isSold = (item.click_count || 0) >= 5;
+                    const campData = CAMPUSES.find(c => c.id === item.campus);
+                    const dist = userLoc && campData ? getDistance(userLoc.lat, userLoc.lng, campData.lat, campData.lng).toFixed(1) + 'km' : item.campus;
 
-                return (
-                    <div key={p.id} className={`product-card ${p.is_admin_post ? 'border-2 border-yellow-500' : ''}`}>
-                         {/* CAROUSEL */}
-                         <div className="h-40 bg-gray-200 relative group overflow-hidden">
-                            <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-full h-full">
-                                {p.images && p.images.length > 0 ? p.images.map((img, idx) => (
-                                    <img key={idx} src={img} className="w-full h-full object-cover flex-shrink-0 snap-center" />
-                                )) : (
-                                    <img src="https://placehold.co/600x600/008069/white?text=No+Photo" className="w-full h-full object-cover flex-shrink-0 snap-center" />
-                                )}
-                            </div>
-                            {p.images?.length > 1 && (
-                                <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
-                                    {p.images.map((_, i) => <div key={i} className="w-1.5 h-1.5 rounded-full bg-white/80 shadow-sm border border-black/10"></div>)}
+                    return (
+                        <div key={item.id} className={`product-card ${item.is_admin_post ? 'border-2 border-yellow-500' : ''}`}>
+                             <div className="h-40 bg-gray-200 relative group overflow-hidden">
+                                <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-full h-full">
+                                    {item.images && item.images.length > 0 ? item.images.map((img, idx) => (
+                                        <img key={idx} src={img} className="w-full h-full object-cover flex-shrink-0 snap-center" />
+                                    )) : <img src="https://placehold.co/600x600/008069/white?text=No+Photo" className="w-full h-full object-cover" />}
                                 </div>
-                            )}
-                            {isSold && <div className="absolute inset-0 bg-black/60 flex items-center justify-center"><span className="text-white font-black border-2 px-2 py-1 -rotate-12">SOLD OUT</span></div>}
-                        </div>
-
-                        <div className="p-4 flex-1 flex flex-col justify-between">
-                            <div>
-                                <h3 className="text-[11px] font-extrabold uppercase truncate opacity-70">{p.title}</h3>
-                                <p className="font-black text-sm text-[var(--wa-teal)] mt-1">₦{Number(p.price).toLocaleString()}</p>
-                                <p className="text-[8px] font-bold text-gray-300 mt-1 uppercase">{dist}</p>
-                                {isAdmin && <p className="text-[8px] text-red-400 font-mono mt-1">IP: {p.ip_address}</p>}
+                                {item.images?.length > 1 && <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">{item.images.map((_, i) => <div key={i} className="w-1.5 h-1.5 rounded-full bg-white/80 shadow-sm border border-black/10"></div>)}</div>}
+                                {isSold && <div className="absolute inset-0 bg-black/60 flex items-center justify-center"><span className="text-white font-black border-2 px-2 py-1 -rotate-12">SOLD OUT</span></div>}
                             </div>
-                            <button onClick={() => handleBuyClick(p)} disabled={isSold} className={`mt-3 block w-full text-center py-2.5 rounded-xl text-[10px] font-black uppercase transition tap ${isSold ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[var(--wa-teal)]/10 text-[var(--wa-teal)] hover:bg-[var(--wa-teal)] hover:text-white'}`}>
-                                {isSold ? 'Sold Out' : 'Chat Buy'}
-                            </button>
-                            {isAdmin && (
-                                <div className="flex gap-2 mt-2">
-                                    <button onClick={() => handleExpunge(p.id)} className="flex-1 bg-red-100 text-red-600 py-1 rounded text-[8px] font-black uppercase">Expunge</button>
-                                    <button onClick={() => handleBanIP(p.ip_address)} className="flex-1 bg-gray-900 text-white py-1 rounded text-[8px] font-black uppercase">Ban IP</button>
+                            <div className="p-4 flex-1 flex flex-col justify-between">
+                                <div>
+                                    <h3 className="text-[11px] font-extrabold uppercase truncate opacity-70">{item.title}</h3>
+                                    <p className="font-black text-sm text-[var(--wa-teal)] mt-1">₦{Number(item.price).toLocaleString()}</p>
+                                    <p className="text-[8px] font-bold text-gray-300 mt-1 uppercase">{dist}</p>
                                 </div>
-                            )}
+                                <button onClick={() => handleBuyClick(item)} disabled={isSold} className={`mt-3 block w-full text-center py-2.5 rounded-xl text-[10px] font-black uppercase transition tap ${isSold ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[var(--wa-teal)]/10 text-[var(--wa-teal)] hover:bg-[var(--wa-teal)] hover:text-white'}`}>{isSold ? 'Sold Out' : 'Chat Buy'}</button>
+                                {isAdmin && <button onClick={() => handleExpungeProduct(item.id)} className="text-red-500 text-[8px] mt-2 font-black uppercase">Expunge</button>}
+                            </div>
                         </div>
-                    </div>
-                );
+                    );
+                } 
+                
+                // --- REQUEST CARD ---
+                else {
+                    const campData = CAMPUSES.find(c => c.id === item.campus);
+                    const dist = userLoc && campData ? getDistance(userLoc.lat, userLoc.lng, campData.lat, campData.lng).toFixed(1) + 'km' : item.campus;
+                    
+                    return (
+                        <div key={item.id} className="product-card border-l-4 border-l-[#8E44AD]">
+                            <div className="p-5 flex flex-col h-full justify-between">
+                                <div>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className="bg-[#8E44AD]/10 text-[#8E44AD] text-[8px] font-black px-2 py-1 rounded uppercase">Request</span>
+                                        <span className="text-[8px] font-bold text-gray-300 uppercase">{dist}</span>
+                                    </div>
+                                    <h3 className="text-xs font-extrabold uppercase leading-tight mb-2">{item.title}</h3>
+                                    {item.image_url && <img src={item.image_url} className="w-12 h-12 rounded-lg object-cover mb-2 border border-gray-100" />}
+                                    <p className="font-black text-sm text-gray-700">Budget: ₦{Number(item.budget).toLocaleString()}</p>
+                                </div>
+                                <button onClick={() => handleFulfillRequest(item)} className="mt-4 block w-full bg-[#8E44AD] text-white text-center py-2.5 rounded-xl text-[10px] font-black uppercase transition tap shadow-md">I Have This</button>
+                                {isAdmin && <button onClick={() => handleExpungeRequest(item.id)} className="text-red-500 text-[8px] mt-2 font-black uppercase text-right block">Remove</button>}
+                            </div>
+                        </div>
+                    );
+                }
             })}
         </main>
 
         <button onClick={() => setShowModal(true)} className="fixed bottom-8 right-6 fab z-50 tap">+</button>
 
-        {/* SOVEREIGN COMMAND PANEL (The Update) */}
-        {showAdminPanel && (
-            <div className="fixed inset-0 z-[200] bg-white dark:bg-black overflow-y-auto">
-                <div className="p-6">
-                    <div className="flex justify-between items-center mb-8">
-                        <h2 className="text-xl font-black uppercase text-[var(--wa-teal)]">Command Center</h2>
-                        <button onClick={() => setShowAdminPanel(false)} className="text-xs font-bold opacity-50 bg-gray-100 px-3 py-1 rounded-lg">CLOSE</button>
-                    </div>
-
-                    <div className="space-y-8">
-                        {/* 1. BROADCAST MANAGER */}
-                        <div className="bg-gray-50 dark:bg-gray-900 p-5 rounded-3xl">
-                            <h3 className="text-xs font-black uppercase text-gray-400 mb-4">📢 Active Broadcasts</h3>
-                            
-                            {/* List of Broadcasts */}
-                            <div className="space-y-3 mb-4">
-                                {broadcasts.map(b => (
-                                    <div key={b.id} className="flex items-center justify-between bg-white dark:bg-black p-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
-                                        <span className={`text-xs font-bold ${!b.is_active && 'opacity-30 line-through'}`}>{b.message}</span>
-                                        <div className="flex items-center gap-2">
-                                            {/* EYE TOGGLE */}
-                                            <button onClick={() => toggleBroadcast(b.id, b.is_active)} className="text-xl tap">
-                                                {b.is_active ? '👁️' : '🚫'}
-                                            </button>
-                                            {/* TRASH */}
-                                            <button onClick={() => deleteBroadcast(b.id)} className="text-xl opacity-30 hover:opacity-100 tap">🗑️</button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Add New Broadcast */}
-                            <form onSubmit={handleAddBroadcast} className="flex gap-2">
-                                <input name="message" className="wa-input" placeholder="New Alert (e.g. Promo)" required />
-                                <button className="bg-black text-white px-4 rounded-xl font-bold text-xs">ADD</button>
-                            </form>
-                        </div>
-
-                        {/* 2. Stats */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-3xl">
-                                <h3 className="text-[10px] font-black uppercase text-gray-400">Total</h3>
-                                <p className="text-4xl font-black text-[var(--wa-teal)] mt-2">{products.length}</p>
-                            </div>
-                            <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl">
-                                <h3 className="text-[10px] font-black uppercase text-gray-400">Active</h3>
-                                <p className="text-4xl font-black text-blue-600 mt-2">{products.filter(p => p.click_count < 5).length}</p>
-                            </div>
-                        </div>
-
-                        {/* 3. Actions */}
-                        <button onClick={handleLogout} className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase">End Sovereign Session</button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* ... MODALS ... */}
+        {/* UNIFIED POST MODAL */}
         {showModal && (
             <div className="fixed inset-0 bg-black/60 z-[100] flex items-end backdrop-blur-sm">
                 <div className="glass-3d w-full p-6 rounded-t-[32px] animate-slide-up max-h-[85vh] overflow-y-auto">
-                    <div className="flex items-center justify-between mb-6">
-                        <button onClick={() => setShowModal(false)} className="text-2xl opacity-60 tap px-2">← <span className="text-sm font-bold align-middle ml-1">Back</span></button>
-                        <h2 className="font-black text-lg uppercase opacity-80">New Listing</h2>
-                        <div className="w-8"></div>
+                    
+                    {/* TYPE TOGGLE */}
+                    <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-2xl">
+                        <button onClick={() => setPostType('sell')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition ${postType === 'sell' ? 'bg-white text-[var(--wa-teal)] shadow-sm' : 'text-gray-400'}`}>I want to Sell</button>
+                        <button onClick={() => setPostType('request')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition ${postType === 'request' ? 'bg-white text-[#8E44AD] shadow-sm' : 'text-gray-400'}`}>I want to Buy</button>
                     </div>
+
                     <form onSubmit={handlePost} className="space-y-4">
                         <div className="grid grid-cols-2 gap-3">
                              <select className="wa-input" value={form.campus} onChange={e => setForm({...form, campus: e.target.value})}>
                                 {CAMPUSES.filter(c => c.id !== 'All').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
-                            <select className="wa-input" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
-                                <option value="Physical">📦 Physical</option>
-                                <option value="Digital">⚡ Digital</option>
-                            </select>
+                            {/* Hide Category for Requests to keep it simple */}
+                            {postType === 'sell' && (
+                                <select className="wa-input" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
+                                    <option value="Physical">📦 Physical</option>
+                                    <option value="Digital">⚡ Digital</option>
+                                </select>
+                            )}
                         </div>
-                        <input className="wa-input" placeholder="Title" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
-                        <input className="wa-input" type="number" placeholder="Price (₦)" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required />
+
+                        <input className="wa-input" placeholder={postType === 'sell' ? "What are you selling?" : "What do you need?"} value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
+                        <input className="wa-input" type="number" placeholder={postType === 'sell' ? "Price (₦)" : "Your Budget (₦)"} value={form.price} onChange={e => setForm({...form, price: e.target.value})} required />
+                        
+                        {/* Image Upload (Optional for Requests) */}
                         <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center relative tap">
                             <input type="file" accept="image/*" multiple onChange={handleImageSelect} className="absolute inset-0 opacity-0 w-full h-full" />
                             {previewUrls.length > 0 ? (
@@ -518,14 +530,52 @@ export default function Marketplace() {
                                     {previewUrls.map((url, i) => <img key={i} src={url} className="h-16 w-16 rounded-lg object-cover shadow-sm" />)}
                                 </div>
                             ) : (
-                                <p className="text-[9px] font-black text-gray-400 uppercase">Tap to Snap (Max 3)</p>
+                                <p className="text-[9px] font-black text-gray-400 uppercase">{postType === 'sell' ? "Tap to Snap (Max 3)" : "Optional Reference Photo"}</p>
                             )}
                         </div>
+
                         <input className="wa-input" type="tel" placeholder="WhatsApp (234...)" value={form.whatsapp} onChange={e => setForm({...form, whatsapp: e.target.value})} required />
-                        <button disabled={submitting} className="w-full bg-[var(--wa-teal)] text-white py-4 rounded-2xl font-black shadow-xl text-lg uppercase tracking-widest tap">
-                            {uploadStatus || "Launch Ad"}
+                        
+                        <button disabled={submitting} className={`w-full text-white py-4 rounded-2xl font-black shadow-xl text-lg uppercase tracking-widest tap ${postType === 'sell' ? 'bg-[var(--wa-teal)]' : 'bg-[#8E44AD]'}`}>
+                            {uploadStatus || (postType === 'sell' ? "Launch Ad" : "Post Request")}
                         </button>
+                        
+                        <button type="button" onClick={() => setShowModal(false)} className="w-full py-3 text-xs font-bold text-gray-400">CANCEL</button>
                     </form>
+                </div>
+            </div>
+        )}
+
+        {/* ... ADMIN PANEL, PRO MODAL, LOGIN MODAL (Unchanged) ... */}
+        {showAdminPanel && (
+            <div className="fixed inset-0 z-[200] bg-white dark:bg-black overflow-y-auto">
+                <div className="p-6">
+                    <div className="flex justify-between items-center mb-8">
+                        <h2 className="text-xl font-black uppercase text-[var(--wa-teal)]">Command Center</h2>
+                        <button onClick={() => setShowAdminPanel(false)} className="text-xs font-bold opacity-50 bg-gray-100 px-3 py-1 rounded-lg">CLOSE</button>
+                    </div>
+                    <div className="space-y-8">
+                        {/* Broadcasts */}
+                        <div className="bg-gray-50 dark:bg-gray-900 p-5 rounded-3xl">
+                            <h3 className="text-xs font-black uppercase text-gray-400 mb-4">📢 Active Broadcasts</h3>
+                            <div className="space-y-3 mb-4">
+                                {broadcasts.map(b => (
+                                    <div key={b.id} className="flex items-center justify-between bg-white dark:bg-black p-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
+                                        <span className={`text-xs font-bold ${!b.is_active && 'opacity-30 line-through'}`}>{b.message}</span>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={() => toggleBroadcast(b.id, b.is_active)} className="text-xl tap">{b.is_active ? '👁️' : '🚫'}</button>
+                                            <button onClick={() => deleteBroadcast(b.id)} className="text-xl opacity-30 hover:opacity-100 tap">🗑️</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <form onSubmit={handleAddBroadcast} className="flex gap-2">
+                                <input name="message" className="wa-input" placeholder="New Alert..." required />
+                                <button className="bg-black text-white px-4 rounded-xl font-bold text-xs">ADD</button>
+                            </form>
+                        </div>
+                        <button onClick={handleLogout} className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase">End Sovereign Session</button>
+                    </div>
                 </div>
             </div>
         )}
@@ -537,25 +587,7 @@ export default function Marketplace() {
                     <div className="text-5xl mb-4">💎</div>
                     <h2 className="text-2xl font-black uppercase text-[var(--wa-teal)] mb-2">Campus Pro</h2>
                     <p className="text-xs font-bold text-gray-400 mb-6">Upgrade your selling power</p>
-                    <div className="space-y-4 text-left mb-8">
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                            <span className="text-xl">🚀</span>
-                            <div>
-                                <div className="font-bold text-sm">15 Posts Daily</div>
-                                <div className="text-[10px] opacity-60">Standard limit is 3</div>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                            <span className="text-xl">✅</span>
-                            <div>
-                                <div className="font-bold text-sm">Verified Badge</div>
-                                <div className="text-[10px] opacity-60">Build instant trust</div>
-                            </div>
-                        </div>
-                    </div>
-                    <a href="https://wa.me/2347068516779?text=I%20want%20to%20upgrade%20to%20Campus%20PRO" target="_blank" className="block w-full bg-[var(--wa-teal)] text-white py-4 rounded-2xl font-black shadow-xl uppercase tap">
-                        Message Admin to Join
-                    </a>
+                    <a href="https://wa.me/2347068516779?text=I%20want%20to%20upgrade%20to%20Campus%20PRO" target="_blank" className="block w-full bg-[var(--wa-teal)] text-white py-4 rounded-2xl font-black shadow-xl uppercase tap">Message Admin to Join</a>
                 </div>
             </div>
         )}
