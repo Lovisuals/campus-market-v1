@@ -69,6 +69,7 @@ export default function Marketplace() {
   const [activeCampus, setActiveCampus] = useState('All');
   const [showModal, setShowModal] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [showProModal, setShowProModal] = useState(false); // NEW: Pro Modal State
   const [isAdmin, setIsAdmin] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [userLoc, setUserLoc] = useState(null);
@@ -77,7 +78,7 @@ export default function Marketplace() {
   
   // Form State
   const [form, setForm] = useState({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
-  const [imageFiles, setImageFiles] = useState([]); // Array for 3 images
+  const [imageFiles, setImageFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
@@ -140,7 +141,7 @@ export default function Marketplace() {
       holdTimer.current = setTimeout(() => {
           if (navigator.vibrate) navigator.vibrate(200);
           setShowLogin(true);
-      }, 3000);
+      }, 2000); // Reduced to 2s for better feel
   };
   const handleLogoTouchEnd = () => clearTimeout(holdTimer.current);
 
@@ -158,23 +159,15 @@ export default function Marketplace() {
       }
   };
 
-  // --- POSTING LOGIC WITH QUOTA ---
   const handlePost = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     
     try {
-        // 1. QUOTA CHECK
         if (!isAdmin) {
             const cleanPhone = form.whatsapp.replace(/\D/g, '');
-            // Check if user is verified (PRO)
-            const { data: proData } = await supabase
-                .from('verified_sellers')
-                .select('limit_per_day')
-                .eq('phone', cleanPhone)
-                .maybeSingle();
-
-            const dailyLimit = proData ? proData.limit_per_day : 3; // 15 for Pro, 3 for Public
+            const { data: proData } = await supabase.from('verified_sellers').select('limit_per_day').eq('phone', cleanPhone).maybeSingle();
+            const dailyLimit = proData ? proData.limit_per_day : 3;
             
             const today = new Date().toLocaleDateString();
             const quota = JSON.parse(localStorage.getItem('post_quota') || '{}');
@@ -186,7 +179,6 @@ export default function Marketplace() {
             }
         }
 
-        // 2. IMAGE UPLOAD (Up to 3)
         let finalImageUrls = [];
         if (imageFiles.length > 0) {
             setUploadStatus('Uploading images...');
@@ -199,11 +191,9 @@ export default function Marketplace() {
                 finalImageUrls.push(publicUrl);
             }
         } else {
-            // Default placeholder if no image
             finalImageUrls.push("https://placehold.co/600x600/008069/white?text=No+Photo");
         }
 
-        // 3. DATABASE INSERT
         setUploadStatus('Publishing...');
         const { error } = await supabase.from('products').insert([{
             title: form.title,
@@ -211,7 +201,7 @@ export default function Marketplace() {
             whatsapp_number: form.whatsapp.replace(/\D/g, ''),
             campus: form.campus,
             item_type: form.type,
-            images: finalImageUrls, // Now an Array
+            images: finalImageUrls,
             is_admin_post: isAdmin,
             ip_address: clientIp,
             user_agent: navigator.userAgent
@@ -219,7 +209,6 @@ export default function Marketplace() {
 
         if (error) throw error;
 
-        // 4. UPDATE QUOTA
         const today = new Date().toLocaleDateString();
         const currentQuota = JSON.parse(localStorage.getItem('post_quota') || '{}');
         const newCount = (currentQuota.date === today ? currentQuota.count : 0) + 1;
@@ -241,20 +230,16 @@ export default function Marketplace() {
   };
 
   const handleImageSelect = (e) => {
-      const files = Array.from(e.target.files).slice(0, 3); // Limit to 3
+      const files = Array.from(e.target.files).slice(0, 3);
       if (files.length > 0) {
           setImageFiles(files);
-          // Generate previews
           const urls = files.map(file => URL.createObjectURL(file));
           setPreviewUrls(urls);
       }
   };
 
   const handleBuyClick = async (product) => {
-      // 1. Trigger WhatsApp Immediately
       window.open(`https://wa.me/${product.whatsapp_number}`, '_blank');
-
-      // 2. Background: Increment Click Count securely via RPC
       if(!isAdmin) {
          await supabase.rpc('increment_clicks', { row_id: product.id });
       }
@@ -287,10 +272,17 @@ export default function Marketplace() {
             </div>
         </div>
 
-        {/* HEADER */}
-        <header className="sticky top-0 z-50 bg-[var(--wa-chat-bg)] border-b border-[var(--border)] pt-safe">
+        {/* HEADER - NOW UNSELECTABLE */}
+        <header className="sticky top-0 z-50 bg-[var(--wa-chat-bg)] border-b border-[var(--border)] pt-safe noselect">
             <div className="px-5 py-4 flex justify-between items-center">
-                <div ref={logoRef} onMouseDown={handleLogoTouchStart} onMouseUp={handleLogoTouchEnd} onTouchStart={handleLogoTouchStart} onTouchEnd={handleLogoTouchEnd} className="cursor-pointer">
+                <div 
+                    ref={logoRef} 
+                    onMouseDown={handleLogoTouchStart} 
+                    onMouseUp={handleLogoTouchEnd} 
+                    onTouchStart={handleLogoTouchStart} 
+                    onTouchEnd={handleLogoTouchEnd} 
+                    className="cursor-pointer"
+                >
                     <h1 className="text-[17px] font-extrabold tracking-tighter text-[var(--wa-teal)]">CAMPUS <span className="opacity-30">MARKETPLACE</span></h1>
                     {isAdmin && <p className="text-[8px] text-yellow-500 font-black uppercase">Sovereign Mode</p>}
                 </div>
@@ -298,7 +290,8 @@ export default function Marketplace() {
                     <button onClick={toggleTheme} className="w-10 h-10 flex items-center justify-center rounded-2xl bg-[var(--surface)] shadow-sm tap">
                         {darkMode ? '☀️' : '🌙'}
                     </button>
-                    <button className="bg-[var(--wa-teal)] text-white px-5 py-2.5 rounded-2xl text-[10px] font-black shadow-lg tap">PRO</button>
+                    {/* PRO BUTTON NOW WORKS */}
+                    <button onClick={() => setShowProModal(true)} className="bg-[var(--wa-teal)] text-white px-5 py-2.5 rounded-2xl text-[10px] font-black shadow-lg tap">PRO</button>
                 </div>
             </div>
             <div className="px-5 pb-3 flex gap-3 overflow-x-auto scrollbar-hide">
@@ -311,7 +304,7 @@ export default function Marketplace() {
             <div className="px-5 py-3">
                 <div className="search-container">
                     <span className="opacity-20 text-sm mr-3">🔍</span>
-                    <input className="flex-1 bg-transparent py-3 text-[13px] font-semibold outline-none" placeholder="Search (e.g. iPhone)..." onChange={(e) => setSearchTerm(e.target.value)} />
+                    <input className="flex-1 bg-transparent py-3 text-[13px] font-semibold outline-none wa-input" placeholder="Search (e.g. iPhone)..." onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
             </div>
         </header>
@@ -325,7 +318,6 @@ export default function Marketplace() {
 
                 return (
                     <div key={p.id} className={`product-card ${p.is_admin_post ? 'border-2 border-yellow-500' : ''}`}>
-                         {/* Image Carousel (Simple: Shows first image) */}
                          <div className="h-40 bg-gray-200 relative">
                             <img src={p.images?.[0] || "https://placehold.co/600x600/008069/white?text=No+Photo"} className="w-full h-full object-cover" />
                             {p.images?.length > 1 && <div className="absolute top-2 right-2 bg-black/50 text-white text-[8px] font-bold px-2 py-1 rounded-full">+{p.images.length-1}</div>}
@@ -371,7 +363,6 @@ export default function Marketplace() {
                         <input className="wa-input" placeholder="Title" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
                         <input className="wa-input" type="number" placeholder="Price (₦)" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required />
                         
-                        {/* 3 IMAGE UPLOAD */}
                         <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center relative tap">
                             <input type="file" accept="image/*" multiple onChange={handleImageSelect} className="absolute inset-0 opacity-0 w-full h-full" />
                             {previewUrls.length > 0 ? (
@@ -388,6 +379,39 @@ export default function Marketplace() {
                             {uploadStatus || "Launch Ad"}
                         </button>
                     </form>
+                </div>
+            </div>
+        )}
+
+        {/* NEW: PRO MODAL */}
+        {showProModal && (
+            <div className="fixed inset-0 z-[140] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-fade-in">
+                <div className="glass-3d w-full max-w-sm p-8 text-center relative">
+                    <button onClick={() => setShowProModal(false)} className="absolute top-4 right-4 text-2xl opacity-50 tap">×</button>
+                    <div className="text-5xl mb-4">💎</div>
+                    <h2 className="text-2xl font-black uppercase text-[var(--wa-teal)] mb-2">Campus Pro</h2>
+                    <p className="text-xs font-bold text-gray-400 mb-6">Upgrade your selling power</p>
+                    
+                    <div className="space-y-4 text-left mb-8">
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                            <span className="text-xl">🚀</span>
+                            <div>
+                                <div className="font-bold text-sm">15 Posts Daily</div>
+                                <div className="text-[10px] opacity-60">Standard limit is 3</div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                            <span className="text-xl">✅</span>
+                            <div>
+                                <div className="font-bold text-sm">Verified Badge</div>
+                                <div className="text-[10px] opacity-60">Build instant trust</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <a href="https://wa.me/2347068516779?text=I%20want%20to%20upgrade%20to%20Campus%20PRO" target="_blank" className="block w-full bg-[var(--wa-teal)] text-white py-4 rounded-2xl font-black shadow-xl uppercase tap">
+                        Message Admin to Join
+                    </a>
                 </div>
             </div>
         )}
