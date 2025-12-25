@@ -1,171 +1,173 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-
 /* =========================================
-   1. GLOBAL VARIABLES & BRAND DNA
+   1. GLOBAL VARIABLES
    ========================================= */
 :root {
-    /* Brand Colors */
-    --wa-teal: #008069;
-    --wa-light: #25D366;
-    --wa-dark: #075E54;
-    --wa-neon: #25D366;
-    
-    /* Layout Colors */
-    --wa-surface: #ffffff;
-    --wa-chat-bg: #ffffff;
-    --wa-muted: #8696a0;
-    --text-primary: #111b21;
-    --border: rgba(0, 0, 0, 0.1);
-    --surface: #f8f9fa; 
+  --wa-teal: #008069;
+  --wa-light: #25D366;
+  --wa-dark: #075E54;
+  --wa-neon: #25D366;
+  
+  --wa-surface: #ffffff;
+  --wa-chat-bg: #ffffff;
+  --wa-muted: #8696a0;
+  --text-primary: #111b21;
+  --border: rgba(0, 0, 0, 0.1);
+  --surface: #f8f9fa; 
 
-    /* Effects */
-    --glass-bg: rgba(255, 255, 255, 0.95);
-    --glass-border: rgba(255, 255, 255, 0.8);
-    --neo-shadow: 0 10px 30px -10px rgba(0, 128, 105, 0.3);
-    --shadow-3d: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.05);
-    --ticker-height: 34px;
+  --glass-bg: rgba(255, 255, 255, 0.95);
+  --glass-border: rgba(255, 255, 255, 0.8);
+  --neo-shadow: 0 10px 30px -10px rgba(0, 128, 105, 0.3);
+  --shadow-3d: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.05);
+  --ticker-height: 34px;
 }
 
-/* Dark Mode */
+/* Dark Mode Overrides */
 .dark-mode {
-    --wa-teal: #25D366;
-    --wa-dark: #111b21;
-    --wa-chat-bg: #0b141a;
-    --wa-surface: #1f2c34;
-    --wa-muted: #8696a0;
-    --text-primary: #e9edef;
-    --border: rgba(255, 255, 255, 0.1);
-    --glass-bg: rgba(31, 44, 52, 0.95);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --shadow-3d: 0 20px 25px -5px rgba(0,0,0,0.3);
-    --surface: #111b21;
+  --wa-teal: #25D366;
+  --wa-dark: #111b21;
+  --wa-chat-bg: #0b141a;
+  --wa-surface: #1f2c34;
+  --wa-muted: #8696a0;
+  --text-primary: #e9edef;
+  --border: rgba(255, 255, 255, 0.1);
+  --glass-bg: rgba(31, 44, 52, 0.95);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --shadow-3d: 0 20px 25px -5px rgba(0,0,0,0.3);
+  --surface: #111b21;
 }
 
 /* =========================================
-   2. BASE RESET & TYPOGRAPHY
+   2. BASE STYLES
    ========================================= */
 body {
-    background-color: var(--wa-chat-bg) !important;
-    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-    color: var(--text-primary);
-    transition: background-color 0.4s ease, color 0.4s ease;
+  background-color: var(--wa-chat-bg);
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  color: var(--text-primary);
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
 
 /* =========================================
-   3. COMPONENTS
+   3. UTILITIES & ANIMATIONS
    ========================================= */
-/* Ticker */
 .ticker-container {
-    overflow: hidden;
-    height: var(--ticker-height);
-    background: #000;
-    display: flex;
-    align-items: center;
-    position: relative;
-    z-index: 60;
+  overflow: hidden;
+  height: var(--ticker-height);
+  background: #000;
+  display: flex;
+  align-items: center;
+  position: relative;
+  z-index: 60;
 }
+
 .ticker-content {
-    display: inline-block;
-    animation: scroll-left 20s linear infinite;
-    white-space: nowrap;
-    padding-left: 100%;
+  display: inline-block;
+  animation: scroll-left 20s linear infinite;
+  white-space: nowrap;
+  padding-left: 100%;
 }
+
 @keyframes scroll-left {
-    0% { transform: translateX(0); }
-    100% { transform: translateX(-100%); }
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
 }
 
-/* Search Bar */
 .search-container {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 0 16px;
-    display: flex;
-    align-items: center;
-    transition: all 0.3s ease;
-}
-.search-container:focus-within {
-    border-color: var(--wa-teal);
-    box-shadow: 0 0 0 3px rgba(0, 128, 105, 0.1);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  transition: all 0.3s ease;
 }
 
-/* Cards */
-#feed {
-    display: grid;
-    gap: 1.25rem;
-    padding: 1rem;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+.search-container:focus-within {
+  border-color: var(--wa-teal);
+  box-shadow: 0 0 0 3px rgba(0, 128, 105, 0.1);
 }
+
+#feed {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 @media (min-width: 768px) {
-    #feed { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  #feed { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 .product-card {
-    background: var(--wa-surface);
-    border-radius: 28px;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-3d);
-    transition: transform 0.3s ease;
-    display: flex;
-    flex-direction: column;
+  background: var(--wa-surface);
+  border-radius: 28px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-3d);
+  transition: transform 0.3s ease;
+  display: flex;
+  flex-direction: column;
 }
+
 .product-card:active { transform: scale(0.98); }
 
-/* Floating Action Button (The "Sell" + Button) */
 .fab {
-    width: 64px;
-    height: 64px;
-    border-radius: 22px;
-    background: var(--wa-teal);
-    box-shadow: var(--neo-shadow);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-    color: white;
-    font-weight: 300;
-    transition: all 0.3s ease;
+  width: 64px;
+  height: 64px;
+  border-radius: 22px;
+  background: var(--wa-teal);
+  box-shadow: var(--neo-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: white;
+  font-weight: 300;
+  transition: all 0.3s ease;
 }
+
 .fab:active { transform: scale(0.9); }
 
-/* Inputs */
 .wa-input {
-    background: var(--surface);
-    border-radius: 20px;
-    padding: 14px 16px;
-    font-size: 15px;
-    border: 1px solid transparent;
-    transition: all 0.2s ease;
-    width: 100%;
-    color: var(--text-primary);
-    outline: none;
-}
-.wa-input:focus {
-    border-color: var(--wa-teal);
-    box-shadow: 0 0 0 3px rgba(0,128,105,0.1);
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 14px 16px;
+  font-size: 15px;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  width: 100%;
+  color: var(--text-primary);
+  outline: none;
 }
 
-/* Modals */
+.wa-input:focus {
+  border-color: var(--wa-teal);
+  box-shadow: 0 0 0 3px rgba(0,128,105,0.1);
+}
+
 .glass-3d {
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    border-radius: 32px;
-    box-shadow: var(--shadow-3d);
-    backdrop-filter: blur(12px);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 32px;
+  box-shadow: var(--shadow-3d);
+  backdrop-filter: blur(12px);
 }
 
 .animate-slide-up {
-    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-@keyframes slideUp {
-    from { transform: translateY(100%); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.tap:active { transform: scale(0.95); }
+
 .scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
