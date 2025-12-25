@@ -10,7 +10,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-// FULL CAMPUS LIST (Updated with TASUED, OOU, UNIPORT, UNIDEL)
 const CAMPUSES = [
   { id: 'All', name: 'All Campuses' },
   { id: 'UNILAG', name: 'UNILAG', lat: 6.5157, lng: 3.3899 },
@@ -73,7 +72,8 @@ export default function Marketplace() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [userLoc, setUserLoc] = useState(null);
-  const [tickerMsg, setTickerMsg] = useState('WELCOME TO CAMPUS MARKETPLACE • BUY & SELL SECURELY');
+  const [tickerMsg, setTickerMsg] = useState('');
+  const [clientIp, setClientIp] = useState('0.0.0.0');
   
   // Form State
   const [form, setForm] = useState({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
@@ -87,6 +87,7 @@ export default function Marketplace() {
   useEffect(() => {
     fetchProducts();
     checkTheme();
+    fetchForensics(); // Get IP Address
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
@@ -95,6 +96,15 @@ export default function Marketplace() {
     checkAdminSession();
     fetchTicker();
   }, []);
+
+  // Forensics: Capture User IP for security
+  const fetchForensics = async () => {
+      try {
+          const res = await fetch('https://api.ipify.org?format=json');
+          const data = await res.json();
+          setClientIp(data.ip);
+      } catch (e) { console.log('Forensics failed'); }
+  };
 
   const checkAdminSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -170,7 +180,9 @@ export default function Marketplace() {
             campus: form.campus,
             item_type: form.type,
             images: [finalImageUrl],
-            is_admin_post: isAdmin
+            is_admin_post: isAdmin,
+            ip_address: clientIp, // FORENSICS
+            user_agent: navigator.userAgent // FORENSICS
         }]);
 
         if (error) throw error;
@@ -187,8 +199,33 @@ export default function Marketplace() {
     }
   };
 
+  // Click Tracking Logic
+  const handleBuyClick = async (product) => {
+      if(!isAdmin) {
+          // Increment Click Count (Triggers expiry if > 5)
+          const newCount = (product.click_count || 0) + 1;
+          // We don't await this because we want the user to go to WhatsApp immediately
+          supabase.from('products').update({ click_count: newCount }).eq('id', product.id).then();
+      }
+      window.open(`https://wa.me/${product.whatsapp_number}`, '_blank');
+  };
+
   // --- RENDER ---
-  let displayProducts = products.filter(p => activeCampus === 'All' || p.campus === activeCampus);
+  // Search Logic
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  let displayProducts = products.filter(p => {
+      // 1. Campus Filter
+      if (activeCampus !== 'All' && p.campus !== activeCampus) return false;
+      
+      // 2. Search Filter
+      const term = searchTerm.toLowerCase();
+      if (term && !p.title.toLowerCase().includes(term) && !p.campus.toLowerCase().includes(term)) return false;
+      
+      return true;
+  });
+
+  // Sort by Distance
   if (userLoc && activeCampus === 'All') {
       displayProducts.sort((a, b) => {
           const cA = CAMPUSES.find(c => c.id === a.campus) || {};
@@ -235,9 +272,11 @@ export default function Marketplace() {
             <div className="px-5 py-3">
                 <div className="search-container">
                     <span className="opacity-20 text-sm mr-3">🔍</span>
-                    <input className="flex-1 bg-transparent py-3 text-[13px] font-semibold outline-none" placeholder="Search campus deals..." onChange={(e) => {
-                       // Visual placeholder for search logic
-                    }} />
+                    <input 
+                        className="flex-1 bg-transparent py-3 text-[13px] font-semibold outline-none" 
+                        placeholder="Search (e.g. iPhone, Blender)..." 
+                        onChange={(e) => setSearchTerm(e.target.value)} 
+                    />
                 </div>
             </div>
         </header>
@@ -245,7 +284,7 @@ export default function Marketplace() {
         {/* FEED */}
         <main id="feed">
             {loading ? <p className="col-span-2 text-center py-10 opacity-40">Loading Market...</p> : displayProducts.map(p => {
-                const isSold = (p.click_count || 0) >= 5;
+                const isSold = (p.click_count || 0) >= 5; // DOCS: 5 Clicks Limit
                 const campData = CAMPUSES.find(c => c.id === p.campus);
                 const dist = userLoc && campData ? getDistance(userLoc.lat, userLoc.lng, campData.lat, campData.lng).toFixed(1) + 'km' : p.campus;
 
@@ -261,7 +300,17 @@ export default function Marketplace() {
                                 <p className="font-black text-sm text-[var(--wa-teal)] mt-1">₦{Number(p.price).toLocaleString()}</p>
                                 <p className="text-[8px] font-bold text-gray-300 mt-1 uppercase">{dist}</p>
                             </div>
-                            <a href={`https://wa.me/${p.whatsapp_number}`} target="_blank" className="mt-3 block w-full bg-[var(--wa-teal)]/10 text-[var(--wa-teal)] text-center py-2.5 rounded-xl text-[10px] font-black uppercase hover:bg-[var(--wa-teal)] hover:text-white transition tap">Chat Buy</a>
+                            
+                            {/* BUY BUTTON with Click Tracking */}
+                            <button 
+                                onClick={() => handleBuyClick(p)} 
+                                disabled={isSold}
+                                className={`mt-3 block w-full text-center py-2.5 rounded-xl text-[10px] font-black uppercase transition tap 
+                                ${isSold ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[var(--wa-teal)]/10 text-[var(--wa-teal)] hover:bg-[var(--wa-teal)] hover:text-white'}`}
+                            >
+                                {isSold ? 'Sold Out' : 'Chat Buy'}
+                            </button>
+                            
                             {isAdmin && <button onClick={async()=>{ if(confirm('Delete?')) { await supabase.from('products').delete().eq('id', p.id); fetchProducts(); } }} className="text-red-500 text-[8px] mt-2 font-black uppercase">Expunge</button>}
                         </div>
                     </div>
@@ -282,7 +331,7 @@ export default function Marketplace() {
                              ← <span className="text-sm font-bold align-middle ml-1">Back</span>
                         </button>
                         <h2 className="font-black text-lg uppercase opacity-80">New Listing</h2>
-                        <div className="w-8"></div> {/* Spacer for balance */}
+                        <div className="w-8"></div>
                     </div>
                     
                     <form onSubmit={handlePost} className="space-y-4">
