@@ -64,9 +64,9 @@ const compressImage = async (file) => {
 
 export default function Marketplace() {
   // STATE
-  const [products, setProducts] = useState([]); // Items for Sale
-  const [requests, setRequests] = useState([]); // Items Wanted
-  const [viewMode, setViewMode] = useState('market'); // 'market' or 'requests'
+  const [products, setProducts] = useState([]);
+  const [requests, setRequests] = useState([]); 
+  const [viewMode, setViewMode] = useState('market'); 
   
   const [loading, setLoading] = useState(true);
   const [activeCampus, setActiveCampus] = useState('All');
@@ -83,7 +83,7 @@ export default function Marketplace() {
   const [clientIp, setClientIp] = useState('0.0.0.0');
   
   // FORM STATE
-  const [postType, setPostType] = useState('sell'); // 'sell' or 'request'
+  const [postType, setPostType] = useState('sell'); 
   const [form, setForm] = useState({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
   const [imageFiles, setImageFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
@@ -93,7 +93,6 @@ export default function Marketplace() {
   const logoRef = useRef(null);
   const holdTimer = useRef(null);
 
-  // --- INIT ---
   useEffect(() => {
     fetchProducts();
     fetchRequests();
@@ -120,6 +119,7 @@ export default function Marketplace() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
         if(payload.eventType === 'INSERT') setProducts(prev => [payload.new, ...prev]);
         else if (payload.eventType === 'DELETE') setProducts(prev => prev.filter(p => p.id !== payload.old.id));
+        else if (payload.eventType === 'UPDATE') setProducts(prev => prev.map(p => p.id === payload.new.id ? payload.new : p));
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, (payload) => {
         if(payload.eventType === 'INSERT') setRequests(prev => [payload.new, ...prev]);
@@ -201,15 +201,23 @@ export default function Marketplace() {
       window.location.reload();
   };
 
-  // --- ADMIN DELETIONS ---
+  // --- ADMIN TOOLS ---
   const handleExpungeProduct = async (id) => {
       if(!confirm("DELETE ITEM?")) return;
       await supabase.from('products').delete().eq('id', id);
   };
+  
+  const handleVerifyProduct = async (id, currentStatus) => {
+      // Toggle the verified status
+      const { error } = await supabase.from('products').update({ is_verified: !currentStatus }).eq('id', id);
+      if(error) alert("Update Failed: " + error.message);
+  };
+
   const handleExpungeRequest = async (id) => {
       if(!confirm("DELETE REQUEST?")) return;
       await supabase.from('requests').delete().eq('id', id);
   };
+  
   const handleBanIP = async (ip) => {
       if(!confirm(`BAN IP ${ip} PERMANENTLY?`)) return;
       await supabase.from('blacklist').insert([{ ip_address: ip, reason: 'Admin Ban' }]);
@@ -232,17 +240,15 @@ export default function Marketplace() {
       await supabase.from('broadcasts').delete().eq('id', id);
   };
 
-  // --- POSTING (Unified Logic) ---
+  // --- POSTING ---
   const handlePost = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     
     try {
-        // Blacklist Check
         const { data: banned } = await supabase.from('blacklist').select('ip_address').eq('ip_address', clientIp).maybeSingle();
         if(banned) { alert("Connection Refused."); setSubmitting(false); return; }
 
-        // Daily Limit (Shared for Sell/Request)
         if (!isAdmin) {
             const cleanPhone = form.whatsapp.replace(/\D/g, '');
             const { data: proData } = await supabase.from('verified_sellers').select('limit_per_day').eq('phone', cleanPhone).maybeSingle();
@@ -254,7 +260,6 @@ export default function Marketplace() {
             }
         }
 
-        // Image Upload (Optional for requests)
         let finalImageUrls = [];
         if (imageFiles.length > 0) {
             setUploadStatus('Uploading...');
@@ -269,7 +274,6 @@ export default function Marketplace() {
             }
         }
 
-        // DB Insert
         setUploadStatus('Publishing...');
         if (postType === 'sell') {
             const { error } = await supabase.from('products').insert([{
@@ -281,23 +285,22 @@ export default function Marketplace() {
                 images: finalImageUrls.length > 0 ? finalImageUrls : ["https://placehold.co/600x600/008069/white?text=No+Photo"],
                 is_admin_post: isAdmin,
                 ip_address: clientIp,
-                user_agent: navigator.userAgent
+                user_agent: navigator.userAgent,
+                is_verified: false // Default
             }]);
             if (error) throw error;
         } else {
-            // REQUEST POST
             const { error } = await supabase.from('requests').insert([{
                 title: form.title,
-                budget: form.price, // Reusing price field as budget
+                budget: form.price, 
                 whatsapp_number: form.whatsapp.replace(/\D/g, ''),
                 campus: form.campus,
-                image_url: finalImageUrls[0] || null, // Optional ref image
+                image_url: finalImageUrls[0] || null, 
                 ip_address: clientIp
             }]);
             if (error) throw error;
         }
 
-        // Update Quota & Cleanup
         const today = new Date().toLocaleDateString();
         const currentQuota = JSON.parse(localStorage.getItem('post_quota') || '{}');
         const newCount = (currentQuota.date === today ? currentQuota.count : 0) + 1;
@@ -340,7 +343,6 @@ export default function Marketplace() {
   // --- RENDER ---
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Filter Logic (Shared)
   const filterList = (list) => {
       return list.filter(item => {
           if (activeCampus !== 'All' && item.campus !== activeCampus) return false;
@@ -352,7 +354,6 @@ export default function Marketplace() {
 
   let displayItems = viewMode === 'market' ? filterList(products) : filterList(requests);
 
-  // Sort by Distance if Loc available
   if (userLoc && activeCampus === 'All') {
       displayItems.sort((a, b) => {
           const cA = CAMPUSES.find(c => c.id === a.campus) || {};
@@ -396,7 +397,6 @@ export default function Marketplace() {
                 </div>
             </div>
 
-            {/* NEW: MODE SWITCHER (Market vs Request) */}
             <div className="px-5 pb-2 flex gap-2">
                 <button 
                     onClick={() => setViewMode('market')} 
@@ -412,7 +412,6 @@ export default function Marketplace() {
                 </button>
             </div>
 
-            {/* Campus List */}
              <div className="px-5 pb-3 flex gap-3 overflow-x-auto scrollbar-hide pt-2">
                 {CAMPUSES.map(c => (
                     <button key={c.id} onClick={() => setActiveCampus(c.id)} className={`flex-none px-5 py-2 rounded-full text-[10px] font-black border transition tap ${activeCampus === c.id ? 'bg-[var(--wa-teal)] text-white border-transparent' : 'border-gray-200 text-gray-400'}`}>
@@ -421,7 +420,6 @@ export default function Marketplace() {
                 ))}
             </div>
             
-            {/* Search */}
             <div className="px-5 py-3">
                 <div className="search-container">
                     <span className="opacity-20 text-sm mr-3">🔍</span>
@@ -451,16 +449,31 @@ export default function Marketplace() {
                                     )) : <img src="https://placehold.co/600x600/008069/white?text=No+Photo" className="w-full h-full object-cover" />}
                                 </div>
                                 {item.images?.length > 1 && <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">{item.images.map((_, i) => <div key={i} className="w-1.5 h-1.5 rounded-full bg-white/80 shadow-sm border border-black/10"></div>)}</div>}
+                                
+                                {/* BADGES */}
                                 {isSold && <div className="absolute inset-0 bg-black/60 flex items-center justify-center"><span className="text-white font-black border-2 px-2 py-1 -rotate-12">SOLD OUT</span></div>}
+                                {item.is_verified && <div className="absolute top-2 right-2 bg-yellow-400 text-black text-[9px] font-black px-2 py-1 rounded-full shadow-lg border border-yellow-200 flex items-center gap-1"><span>🛡️</span>VERIFIED</div>}
                             </div>
+                            
                             <div className="p-4 flex-1 flex flex-col justify-between">
                                 <div>
-                                    <h3 className="text-[11px] font-extrabold uppercase truncate opacity-70">{item.title}</h3>
+                                    <h3 className="text-[11px] font-extrabold uppercase truncate opacity-70 flex items-center gap-1">
+                                        {item.title}
+                                        {item.is_verified && <span className="text-yellow-500 text-sm">✓</span>}
+                                    </h3>
                                     <p className="font-black text-sm text-[var(--wa-teal)] mt-1">₦{Number(item.price).toLocaleString()}</p>
                                     <p className="text-[8px] font-bold text-gray-300 mt-1 uppercase">{dist}</p>
                                 </div>
                                 <button onClick={() => handleBuyClick(item)} disabled={isSold} className={`mt-3 block w-full text-center py-2.5 rounded-xl text-[10px] font-black uppercase transition tap ${isSold ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[var(--wa-teal)]/10 text-[var(--wa-teal)] hover:bg-[var(--wa-teal)] hover:text-white'}`}>{isSold ? 'Sold Out' : 'Chat Buy'}</button>
-                                {isAdmin && <button onClick={() => handleExpungeProduct(item.id)} className="text-red-500 text-[8px] mt-2 font-black uppercase">Expunge</button>}
+                                
+                                {isAdmin && (
+                                    <div className="flex gap-2 mt-2">
+                                        <button onClick={() => handleExpungeProduct(item.id)} className="flex-1 bg-red-100 text-red-600 py-1 rounded text-[8px] font-black uppercase">Expunge</button>
+                                        <button onClick={() => handleVerifyProduct(item.id, item.is_verified)} className={`flex-1 py-1 rounded text-[8px] font-black uppercase ${item.is_verified ? 'bg-gray-200 text-gray-500' : 'bg-yellow-100 text-yellow-700'}`}>
+                                            {item.is_verified ? 'Un-Verify' : 'Verify'}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     );
@@ -494,23 +507,19 @@ export default function Marketplace() {
 
         <button onClick={() => setShowModal(true)} className="fixed bottom-8 right-6 fab z-50 tap">+</button>
 
-        {/* UNIFIED POST MODAL */}
+        {/* ... MODALS (Same as previous) ... */}
         {showModal && (
             <div className="fixed inset-0 bg-black/60 z-[100] flex items-end backdrop-blur-sm">
                 <div className="glass-3d w-full p-6 rounded-t-[32px] animate-slide-up max-h-[85vh] overflow-y-auto">
-                    
-                    {/* TYPE TOGGLE */}
                     <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-2xl">
                         <button onClick={() => setPostType('sell')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition ${postType === 'sell' ? 'bg-white text-[var(--wa-teal)] shadow-sm' : 'text-gray-400'}`}>I want to Sell</button>
                         <button onClick={() => setPostType('request')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition ${postType === 'request' ? 'bg-white text-[#8E44AD] shadow-sm' : 'text-gray-400'}`}>I want to Buy</button>
                     </div>
-
                     <form onSubmit={handlePost} className="space-y-4">
                         <div className="grid grid-cols-2 gap-3">
                              <select className="wa-input" value={form.campus} onChange={e => setForm({...form, campus: e.target.value})}>
                                 {CAMPUSES.filter(c => c.id !== 'All').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
-                            {/* Hide Category for Requests to keep it simple */}
                             {postType === 'sell' && (
                                 <select className="wa-input" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
                                     <option value="Physical">📦 Physical</option>
@@ -518,11 +527,8 @@ export default function Marketplace() {
                                 </select>
                             )}
                         </div>
-
                         <input className="wa-input" placeholder={postType === 'sell' ? "What are you selling?" : "What do you need?"} value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
                         <input className="wa-input" type="number" placeholder={postType === 'sell' ? "Price (₦)" : "Your Budget (₦)"} value={form.price} onChange={e => setForm({...form, price: e.target.value})} required />
-                        
-                        {/* Image Upload (Optional for Requests) */}
                         <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center relative tap">
                             <input type="file" accept="image/*" multiple onChange={handleImageSelect} className="absolute inset-0 opacity-0 w-full h-full" />
                             {previewUrls.length > 0 ? (
@@ -533,20 +539,16 @@ export default function Marketplace() {
                                 <p className="text-[9px] font-black text-gray-400 uppercase">{postType === 'sell' ? "Tap to Snap (Max 3)" : "Optional Reference Photo"}</p>
                             )}
                         </div>
-
                         <input className="wa-input" type="tel" placeholder="WhatsApp (234...)" value={form.whatsapp} onChange={e => setForm({...form, whatsapp: e.target.value})} required />
-                        
                         <button disabled={submitting} className={`w-full text-white py-4 rounded-2xl font-black shadow-xl text-lg uppercase tracking-widest tap ${postType === 'sell' ? 'bg-[var(--wa-teal)]' : 'bg-[#8E44AD]'}`}>
                             {uploadStatus || (postType === 'sell' ? "Launch Ad" : "Post Request")}
                         </button>
-                        
                         <button type="button" onClick={() => setShowModal(false)} className="w-full py-3 text-xs font-bold text-gray-400">CANCEL</button>
                     </form>
                 </div>
             </div>
         )}
 
-        {/* ... ADMIN PANEL, PRO MODAL, LOGIN MODAL (Unchanged) ... */}
         {showAdminPanel && (
             <div className="fixed inset-0 z-[200] bg-white dark:bg-black overflow-y-auto">
                 <div className="p-6">
@@ -555,7 +557,6 @@ export default function Marketplace() {
                         <button onClick={() => setShowAdminPanel(false)} className="text-xs font-bold opacity-50 bg-gray-100 px-3 py-1 rounded-lg">CLOSE</button>
                     </div>
                     <div className="space-y-8">
-                        {/* Broadcasts */}
                         <div className="bg-gray-50 dark:bg-gray-900 p-5 rounded-3xl">
                             <h3 className="text-xs font-black uppercase text-gray-400 mb-4">📢 Active Broadcasts</h3>
                             <div className="space-y-3 mb-4">
