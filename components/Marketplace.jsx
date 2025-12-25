@@ -77,9 +77,10 @@ export default function Marketplace() {
   
   // Form State
   const [form, setForm] = useState({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
-  const [imageFile, setImageFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
+  const [imageFiles, setImageFiles] = useState([]); // Array for 3 images
+  const [previewUrls, setPreviewUrls] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
 
   const logoRef = useRef(null);
   const holdTimer = useRef(null);
@@ -87,7 +88,7 @@ export default function Marketplace() {
   useEffect(() => {
     fetchProducts();
     checkTheme();
-    fetchForensics(); // Get IP Address
+    fetchForensics();
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
@@ -97,7 +98,6 @@ export default function Marketplace() {
     fetchTicker();
   }, []);
 
-  // Forensics: Capture User IP for security
   const fetchForensics = async () => {
       try {
           const res = await fetch('https://api.ipify.org?format=json');
@@ -158,74 +158,118 @@ export default function Marketplace() {
       }
   };
 
+  // --- POSTING LOGIC WITH QUOTA ---
   const handlePost = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     
     try {
-        let finalImageUrl = "https://placehold.co/600x600/008069/white?text=No+Photo";
-        if (imageFile) {
-            const compressedBlob = await compressImage(imageFile);
-            const filename = `item_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-            const { error: uploadError } = await supabase.storage.from('item-images').upload(filename, compressedBlob);
-            if (uploadError) throw uploadError;
-            const { data: { publicUrl } } = supabase.storage.from('item-images').getPublicUrl(filename);
-            finalImageUrl = publicUrl;
+        // 1. QUOTA CHECK
+        if (!isAdmin) {
+            const cleanPhone = form.whatsapp.replace(/\D/g, '');
+            // Check if user is verified (PRO)
+            const { data: proData } = await supabase
+                .from('verified_sellers')
+                .select('limit_per_day')
+                .eq('phone', cleanPhone)
+                .maybeSingle();
+
+            const dailyLimit = proData ? proData.limit_per_day : 3; // 15 for Pro, 3 for Public
+            
+            const today = new Date().toLocaleDateString();
+            const quota = JSON.parse(localStorage.getItem('post_quota') || '{}');
+            
+            if (quota.date === today && quota.count >= dailyLimit) {
+                alert(`Daily Limit Reached! You have used ${quota.count}/${dailyLimit} posts today.`);
+                setSubmitting(false);
+                return;
+            }
         }
 
+        // 2. IMAGE UPLOAD (Up to 3)
+        let finalImageUrls = [];
+        if (imageFiles.length > 0) {
+            setUploadStatus('Uploading images...');
+            for (let i = 0; i < imageFiles.length; i++) {
+                const compressedBlob = await compressImage(imageFiles[i]);
+                const filename = `item_${Date.now()}_${i}_${Math.random().toString(36).slice(2)}`;
+                const { error: uploadError } = await supabase.storage.from('item-images').upload(filename, compressedBlob);
+                if (uploadError) throw uploadError;
+                const { data: { publicUrl } } = supabase.storage.from('item-images').getPublicUrl(filename);
+                finalImageUrls.push(publicUrl);
+            }
+        } else {
+            // Default placeholder if no image
+            finalImageUrls.push("https://placehold.co/600x600/008069/white?text=No+Photo");
+        }
+
+        // 3. DATABASE INSERT
+        setUploadStatus('Publishing...');
         const { error } = await supabase.from('products').insert([{
             title: form.title,
             price: form.price,
             whatsapp_number: form.whatsapp.replace(/\D/g, ''),
             campus: form.campus,
             item_type: form.type,
-            images: [finalImageUrl],
+            images: finalImageUrls, // Now an Array
             is_admin_post: isAdmin,
-            ip_address: clientIp, // FORENSICS
-            user_agent: navigator.userAgent // FORENSICS
+            ip_address: clientIp,
+            user_agent: navigator.userAgent
         }]);
 
         if (error) throw error;
+
+        // 4. UPDATE QUOTA
+        const today = new Date().toLocaleDateString();
+        const currentQuota = JSON.parse(localStorage.getItem('post_quota') || '{}');
+        const newCount = (currentQuota.date === today ? currentQuota.count : 0) + 1;
+        localStorage.setItem('post_quota', JSON.stringify({ date: today, count: newCount }));
+
         confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
         setShowModal(false);
         setForm({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
-        setImageFile(null);
-        setPreviewUrl(null);
+        setImageFiles([]);
+        setPreviewUrls([]);
         fetchProducts();
+
     } catch (err) {
         alert("Error: " + err.message);
     } finally {
         setSubmitting(false);
+        setUploadStatus('');
     }
   };
 
-  // Click Tracking Logic
-  const handleBuyClick = async (product) => {
-      if(!isAdmin) {
-          // Increment Click Count (Triggers expiry if > 5)
-          const newCount = (product.click_count || 0) + 1;
-          // We don't await this because we want the user to go to WhatsApp immediately
-          supabase.from('products').update({ click_count: newCount }).eq('id', product.id).then();
+  const handleImageSelect = (e) => {
+      const files = Array.from(e.target.files).slice(0, 3); // Limit to 3
+      if (files.length > 0) {
+          setImageFiles(files);
+          // Generate previews
+          const urls = files.map(file => URL.createObjectURL(file));
+          setPreviewUrls(urls);
       }
+  };
+
+  const handleBuyClick = async (product) => {
+      // 1. Trigger WhatsApp Immediately
       window.open(`https://wa.me/${product.whatsapp_number}`, '_blank');
+
+      // 2. Background: Increment Click Count securely via RPC
+      if(!isAdmin) {
+         await supabase.rpc('increment_clicks', { row_id: product.id });
+      }
   };
 
   // --- RENDER ---
-  // Search Logic
   const [searchTerm, setSearchTerm] = useState('');
   
   let displayProducts = products.filter(p => {
-      // 1. Campus Filter
       if (activeCampus !== 'All' && p.campus !== activeCampus) return false;
-      
-      // 2. Search Filter
       const term = searchTerm.toLowerCase();
       if (term && !p.title.toLowerCase().includes(term) && !p.campus.toLowerCase().includes(term)) return false;
-      
       return true;
   });
 
-  // Sort by Distance
   if (userLoc && activeCampus === 'All') {
       displayProducts.sort((a, b) => {
           const cA = CAMPUSES.find(c => c.id === a.campus) || {};
@@ -254,12 +298,9 @@ export default function Marketplace() {
                     <button onClick={toggleTheme} className="w-10 h-10 flex items-center justify-center rounded-2xl bg-[var(--surface)] shadow-sm tap">
                         {darkMode ? '☀️' : '🌙'}
                     </button>
-                    {/* PRO BUTTON */}
                     <button className="bg-[var(--wa-teal)] text-white px-5 py-2.5 rounded-2xl text-[10px] font-black shadow-lg tap">PRO</button>
                 </div>
             </div>
-
-            {/* CAMPUS LIST */}
             <div className="px-5 pb-3 flex gap-3 overflow-x-auto scrollbar-hide">
                 {CAMPUSES.map(c => (
                     <button key={c.id} onClick={() => setActiveCampus(c.id)} className={`flex-none px-5 py-2 rounded-full text-[10px] font-black border transition tap ${activeCampus === c.id ? 'bg-[var(--wa-teal)] text-white border-transparent' : 'border-gray-200 text-gray-400'}`}>
@@ -267,16 +308,10 @@ export default function Marketplace() {
                     </button>
                 ))}
             </div>
-
-            {/* SEARCH */}
             <div className="px-5 py-3">
                 <div className="search-container">
                     <span className="opacity-20 text-sm mr-3">🔍</span>
-                    <input 
-                        className="flex-1 bg-transparent py-3 text-[13px] font-semibold outline-none" 
-                        placeholder="Search (e.g. iPhone, Blender)..." 
-                        onChange={(e) => setSearchTerm(e.target.value)} 
-                    />
+                    <input className="flex-1 bg-transparent py-3 text-[13px] font-semibold outline-none" placeholder="Search (e.g. iPhone)..." onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
             </div>
         </header>
@@ -284,14 +319,16 @@ export default function Marketplace() {
         {/* FEED */}
         <main id="feed">
             {loading ? <p className="col-span-2 text-center py-10 opacity-40">Loading Market...</p> : displayProducts.map(p => {
-                const isSold = (p.click_count || 0) >= 5; // DOCS: 5 Clicks Limit
+                const isSold = (p.click_count || 0) >= 5;
                 const campData = CAMPUSES.find(c => c.id === p.campus);
                 const dist = userLoc && campData ? getDistance(userLoc.lat, userLoc.lng, campData.lat, campData.lng).toFixed(1) + 'km' : p.campus;
 
                 return (
                     <div key={p.id} className={`product-card ${p.is_admin_post ? 'border-2 border-yellow-500' : ''}`}>
+                         {/* Image Carousel (Simple: Shows first image) */}
                          <div className="h-40 bg-gray-200 relative">
-                            <img src={p.images?.[0]} className="w-full h-full object-cover" />
+                            <img src={p.images?.[0] || "https://placehold.co/600x600/008069/white?text=No+Photo"} className="w-full h-full object-cover" />
+                            {p.images?.length > 1 && <div className="absolute top-2 right-2 bg-black/50 text-white text-[8px] font-bold px-2 py-1 rounded-full">+{p.images.length-1}</div>}
                             {isSold && <div className="absolute inset-0 bg-black/60 flex items-center justify-center"><span className="text-white font-black border-2 px-2 py-1 -rotate-12">SOLD OUT</span></div>}
                         </div>
                         <div className="p-4 flex-1 flex flex-col justify-between">
@@ -300,17 +337,9 @@ export default function Marketplace() {
                                 <p className="font-black text-sm text-[var(--wa-teal)] mt-1">₦{Number(p.price).toLocaleString()}</p>
                                 <p className="text-[8px] font-bold text-gray-300 mt-1 uppercase">{dist}</p>
                             </div>
-                            
-                            {/* BUY BUTTON with Click Tracking */}
-                            <button 
-                                onClick={() => handleBuyClick(p)} 
-                                disabled={isSold}
-                                className={`mt-3 block w-full text-center py-2.5 rounded-xl text-[10px] font-black uppercase transition tap 
-                                ${isSold ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[var(--wa-teal)]/10 text-[var(--wa-teal)] hover:bg-[var(--wa-teal)] hover:text-white'}`}
-                            >
+                            <button onClick={() => handleBuyClick(p)} disabled={isSold} className={`mt-3 block w-full text-center py-2.5 rounded-xl text-[10px] font-black uppercase transition tap ${isSold ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[var(--wa-teal)]/10 text-[var(--wa-teal)] hover:bg-[var(--wa-teal)] hover:text-white'}`}>
                                 {isSold ? 'Sold Out' : 'Chat Buy'}
                             </button>
-                            
                             {isAdmin && <button onClick={async()=>{ if(confirm('Delete?')) { await supabase.from('products').delete().eq('id', p.id); fetchProducts(); } }} className="text-red-500 text-[8px] mt-2 font-black uppercase">Expunge</button>}
                         </div>
                     </div>
@@ -318,22 +347,17 @@ export default function Marketplace() {
             })}
         </main>
 
-        {/* FAB (Floating Action Button) */}
         <button onClick={() => setShowModal(true)} className="fixed bottom-8 right-6 fab z-50 tap">+</button>
 
         {/* SELL MODAL */}
         {showModal && (
             <div className="fixed inset-0 bg-black/60 z-[100] flex items-end backdrop-blur-sm">
                 <div className="glass-3d w-full p-6 rounded-t-[32px] animate-slide-up max-h-[85vh] overflow-y-auto">
-                    {/* Header with BACK button */}
                     <div className="flex items-center justify-between mb-6">
-                        <button onClick={() => setShowModal(false)} className="text-2xl opacity-60 tap px-2">
-                             ← <span className="text-sm font-bold align-middle ml-1">Back</span>
-                        </button>
+                        <button onClick={() => setShowModal(false)} className="text-2xl opacity-60 tap px-2">← <span className="text-sm font-bold align-middle ml-1">Back</span></button>
                         <h2 className="font-black text-lg uppercase opacity-80">New Listing</h2>
                         <div className="w-8"></div>
                     </div>
-                    
                     <form onSubmit={handlePost} className="space-y-4">
                         <div className="grid grid-cols-2 gap-3">
                              <select className="wa-input" value={form.campus} onChange={e => setForm({...form, campus: e.target.value})}>
@@ -344,22 +368,24 @@ export default function Marketplace() {
                                 <option value="Digital">⚡ Digital</option>
                             </select>
                         </div>
-                        <input className="wa-input" placeholder="What are you selling?" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
+                        <input className="wa-input" placeholder="Title" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
                         <input className="wa-input" type="number" placeholder="Price (₦)" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required />
                         
+                        {/* 3 IMAGE UPLOAD */}
                         <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center relative tap">
-                            <input type="file" accept="image/*" onChange={(e) => {
-                                if(e.target.files[0]) {
-                                    setImageFile(e.target.files[0]);
-                                    setPreviewUrl(URL.createObjectURL(e.target.files[0]));
-                                }
-                            }} className="absolute inset-0 opacity-0 w-full h-full" />
-                            {previewUrl ? <img src={previewUrl} className="h-24 mx-auto rounded-xl shadow-lg" /> : <p className="text-[9px] font-black text-gray-400 uppercase">Tap to Snap Photo</p>}
+                            <input type="file" accept="image/*" multiple onChange={handleImageSelect} className="absolute inset-0 opacity-0 w-full h-full" />
+                            {previewUrls.length > 0 ? (
+                                <div className="flex gap-2 justify-center overflow-x-auto">
+                                    {previewUrls.map((url, i) => <img key={i} src={url} className="h-16 w-16 rounded-lg object-cover shadow-sm" />)}
+                                </div>
+                            ) : (
+                                <p className="text-[9px] font-black text-gray-400 uppercase">Tap to Snap (Max 3)</p>
+                            )}
                         </div>
 
                         <input className="wa-input" type="tel" placeholder="WhatsApp (234...)" value={form.whatsapp} onChange={e => setForm({...form, whatsapp: e.target.value})} required />
                         <button disabled={submitting} className="w-full bg-[var(--wa-teal)] text-white py-4 rounded-2xl font-black shadow-xl text-lg uppercase tracking-widest tap">
-                            {submitting ? "Processing..." : "Launch Ad"}
+                            {uploadStatus || "Launch Ad"}
                         </button>
                     </form>
                 </div>
