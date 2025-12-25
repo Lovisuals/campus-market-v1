@@ -30,7 +30,6 @@ const CAMPUSES = [
   { id: 'ABU', name: 'ABU Zaria', lat: 11.1517, lng: 7.6492 }
 ];
 
-// --- UTILITIES ---
 const getDistance = (lat1, lon1, lat2, lon2) => {
     if (!lat1 || !lat2) return 0;
     const R = 6371; 
@@ -70,6 +69,7 @@ export default function Marketplace() {
   const [showModal, setShowModal] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false); // NEW: Admin Panel
   const [isAdmin, setIsAdmin] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [userLoc, setUserLoc] = useState(null);
@@ -88,33 +88,44 @@ export default function Marketplace() {
 
   useEffect(() => {
     fetchProducts();
-    // THEME: Default to Light (White) Mode
+    
+    // Theme
     const savedTheme = localStorage.getItem('sentinel_theme');
     if (savedTheme === 'dark') {
         setDarkMode(true);
         document.body.classList.add('dark-mode');
-    } else {
-        setDarkMode(false);
-        document.body.classList.remove('dark-mode');
     }
+
+    // Forensics
+    fetch('https://api.ipify.org?format=json').then(res => res.json()).then(data => setClientIp(data.ip)).catch(() => {});
     
-    fetchForensics();
+    // Geolocation
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         });
     }
+
     checkAdminSession();
     fetchTicker();
-  }, []);
 
-  const fetchForensics = async () => {
-      try {
-          const res = await fetch('https://api.ipify.org?format=json');
-          const data = await res.json();
-          setClientIp(data.ip);
-      } catch (e) { console.log('Forensics failed'); }
-  };
+    // REALTIME LISTENER
+    const channel = supabase.channel('realtime_feed')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
+        if(payload.eventType === 'INSERT') {
+            setProducts(prev => [payload.new, ...prev]);
+            // Flash effect for new items could be added here
+        } else if (payload.eventType === 'DELETE') {
+            setProducts(prev => prev.filter(p => p.id !== payload.old.id));
+        } else if (payload.eventType === 'UPDATE') {
+             setProducts(prev => prev.map(p => p.id === payload.new.id ? payload.new : p));
+        }
+    })
+    .subscribe();
+
+    return () => { supabase.removeChannel(channel); }
+
+  }, []);
 
   const checkAdminSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -144,7 +155,7 @@ export default function Marketplace() {
       }
   };
 
-  // --- ACTIONS ---
+  // --- ADMIN ACTIONS ---
   const handleLogoTouchStart = () => {
       holdTimer.current = setTimeout(() => {
           if (navigator.vibrate) navigator.vibrate(200);
@@ -162,16 +173,58 @@ export default function Marketplace() {
       if (!error) {
           setIsAdmin(true);
           setShowLogin(false);
+          setShowAdminPanel(true); // Open panel immediately
       } else {
-          alert("Access Denied");
+          alert("Access Denied: " + error.message);
       }
   };
 
+  const handleLogout = async () => {
+      await supabase.auth.signOut();
+      setIsAdmin(false);
+      setShowAdminPanel(false);
+      window.location.reload();
+  };
+
+  const handleExpunge = async (id) => {
+      if(!confirm("PERMANENTLY DELETE?")) return;
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      if(error) alert("Failed: " + error.message);
+      // Realtime will handle the UI update
+  };
+
+  const handleBanIP = async (ip) => {
+      if(!confirm(`BAN IP ${ip} PERMANENTLY?`)) return;
+      const { error } = await supabase.from('blacklist').insert([{ ip_address: ip, reason: 'Admin Ban' }]);
+      if(error) alert("Ban Failed: " + error.message);
+      else alert("Target Neutralized.");
+  };
+
+  const handleUpdateTicker = async (e) => {
+      e.preventDefault();
+      const val = e.target.ticker.value;
+      const { error } = await supabase.from('admin_settings').upsert({ key: 'global_alert', value: val });
+      if(!error) {
+          setTickerMsg(val);
+          alert("Broadcast Updated");
+      }
+  };
+
+  // --- POSTING ---
   const handlePost = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     
     try {
+        // 0. CHECK BLACKLIST
+        const { data: banned } = await supabase.from('blacklist').select('ip_address').eq('ip_address', clientIp).maybeSingle();
+        if(banned) {
+            alert("Connection Refused: You are blacklisted.");
+            setSubmitting(false);
+            return;
+        }
+
+        // 1. QUOTA CHECK
         if (!isAdmin) {
             const cleanPhone = form.whatsapp.replace(/\D/g, '');
             const { data: proData } = await supabase.from('verified_sellers').select('limit_per_day').eq('phone', cleanPhone).maybeSingle();
@@ -181,7 +234,7 @@ export default function Marketplace() {
             const quota = JSON.parse(localStorage.getItem('post_quota') || '{}');
             
             if (quota.date === today && quota.count >= dailyLimit) {
-                alert(`Daily Limit Reached! You have used ${quota.count}/${dailyLimit} posts today.`);
+                alert(`Daily Limit Reached!`);
                 setSubmitting(false);
                 return;
             }
@@ -217,6 +270,7 @@ export default function Marketplace() {
 
         if (error) throw error;
 
+        // Update Local Quota
         const today = new Date().toLocaleDateString();
         const currentQuota = JSON.parse(localStorage.getItem('post_quota') || '{}');
         const newCount = (currentQuota.date === today ? currentQuota.count : 0) + 1;
@@ -227,7 +281,6 @@ export default function Marketplace() {
         setForm({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
         setImageFiles([]);
         setPreviewUrls([]);
-        fetchProducts();
 
     } catch (err) {
         alert("Error: " + err.message);
@@ -292,16 +345,21 @@ export default function Marketplace() {
                     className="cursor-pointer"
                 >
                     <h1 className="text-[17px] font-extrabold tracking-tighter text-[var(--wa-teal)]">CAMPUS <span className="opacity-30">MARKETPLACE</span></h1>
-                    {isAdmin && <p className="text-[8px] text-yellow-500 font-black uppercase">Sovereign Mode</p>}
+                    {isAdmin && <span className="text-[8px] text-yellow-500 font-black uppercase bg-yellow-100 px-1 rounded ml-1">Sovereign Active</span>}
                 </div>
                 <div className="flex gap-3">
                     <button onClick={toggleTheme} className="w-10 h-10 flex items-center justify-center rounded-2xl bg-[var(--surface)] shadow-sm tap">
                         {darkMode ? '☀️' : '🌙'}
                     </button>
-                    <button onClick={() => setShowProModal(true)} className="bg-[var(--wa-teal)] text-white px-5 py-2.5 rounded-2xl text-[10px] font-black shadow-lg tap">PRO</button>
+                    {isAdmin ? (
+                        <button onClick={() => setShowAdminPanel(true)} className="bg-black text-white px-5 py-2.5 rounded-2xl text-[10px] font-black shadow-lg tap">COMMAND</button>
+                    ) : (
+                        <button onClick={() => setShowProModal(true)} className="bg-[var(--wa-teal)] text-white px-5 py-2.5 rounded-2xl text-[10px] font-black shadow-lg tap">PRO</button>
+                    )}
                 </div>
             </div>
-            <div className="px-5 pb-3 flex gap-3 overflow-x-auto scrollbar-hide">
+            {/* ... Campus List & Search ... */}
+             <div className="px-5 pb-3 flex gap-3 overflow-x-auto scrollbar-hide">
                 {CAMPUSES.map(c => (
                     <button key={c.id} onClick={() => setActiveCampus(c.id)} className={`flex-none px-5 py-2 rounded-full text-[10px] font-black border transition tap ${activeCampus === c.id ? 'bg-[var(--wa-teal)] text-white border-transparent' : 'border-gray-200 text-gray-400'}`}>
                         {c.name}
@@ -325,7 +383,6 @@ export default function Marketplace() {
 
                 return (
                     <div key={p.id} className={`product-card ${p.is_admin_post ? 'border-2 border-yellow-500' : ''}`}>
-                         {/* CAROUSEL / SWIPEABLE IMAGE AREA */}
                          <div className="h-40 bg-gray-200 relative group overflow-hidden">
                             <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-full h-full">
                                 {p.images && p.images.length > 0 ? p.images.map((img, idx) => (
@@ -334,16 +391,11 @@ export default function Marketplace() {
                                     <img src="https://placehold.co/600x600/008069/white?text=No+Photo" className="w-full h-full object-cover flex-shrink-0 snap-center" />
                                 )}
                             </div>
-                            
-                            {/* DOTS INDICATOR (Only if > 1 image) */}
                             {p.images?.length > 1 && (
                                 <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
-                                    {p.images.map((_, i) => (
-                                        <div key={i} className="w-1.5 h-1.5 rounded-full bg-white/80 shadow-sm border border-black/10"></div>
-                                    ))}
+                                    {p.images.map((_, i) => <div key={i} className="w-1.5 h-1.5 rounded-full bg-white/80 shadow-sm border border-black/10"></div>)}
                                 </div>
                             )}
-
                             {isSold && <div className="absolute inset-0 bg-black/60 flex items-center justify-center"><span className="text-white font-black border-2 px-2 py-1 -rotate-12">SOLD OUT</span></div>}
                         </div>
 
@@ -352,11 +404,17 @@ export default function Marketplace() {
                                 <h3 className="text-[11px] font-extrabold uppercase truncate opacity-70">{p.title}</h3>
                                 <p className="font-black text-sm text-[var(--wa-teal)] mt-1">₦{Number(p.price).toLocaleString()}</p>
                                 <p className="text-[8px] font-bold text-gray-300 mt-1 uppercase">{dist}</p>
+                                {isAdmin && <p className="text-[8px] text-red-400 font-mono mt-1">IP: {p.ip_address}</p>}
                             </div>
                             <button onClick={() => handleBuyClick(p)} disabled={isSold} className={`mt-3 block w-full text-center py-2.5 rounded-xl text-[10px] font-black uppercase transition tap ${isSold ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[var(--wa-teal)]/10 text-[var(--wa-teal)] hover:bg-[var(--wa-teal)] hover:text-white'}`}>
                                 {isSold ? 'Sold Out' : 'Chat Buy'}
                             </button>
-                            {isAdmin && <button onClick={async()=>{ if(confirm('Delete?')) { await supabase.from('products').delete().eq('id', p.id); fetchProducts(); } }} className="text-red-500 text-[8px] mt-2 font-black uppercase">Expunge</button>}
+                            {isAdmin && (
+                                <div className="flex gap-2 mt-2">
+                                    <button onClick={() => handleExpunge(p.id)} className="flex-1 bg-red-100 text-red-600 py-1 rounded text-[8px] font-black uppercase">Expunge</button>
+                                    <button onClick={() => handleBanIP(p.ip_address)} className="flex-1 bg-gray-900 text-white py-1 rounded text-[8px] font-black uppercase">Ban IP</button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 );
@@ -365,7 +423,45 @@ export default function Marketplace() {
 
         <button onClick={() => setShowModal(true)} className="fixed bottom-8 right-6 fab z-50 tap">+</button>
 
-        {/* SELL MODAL */}
+        {/* ADMIN COMMAND CENTER */}
+        {showAdminPanel && (
+            <div className="fixed inset-0 z-[200] bg-white dark:bg-black overflow-y-auto">
+                <div className="p-6">
+                    <div className="flex justify-between items-center mb-8">
+                        <h2 className="text-2xl font-black uppercase text-[var(--wa-teal)]">Sovereign Command</h2>
+                        <button onClick={() => setShowAdminPanel(false)} className="text-sm font-bold opacity-50">CLOSE</button>
+                    </div>
+
+                    <div className="space-y-8">
+                        {/* 1. Global Ticker */}
+                        <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-3xl">
+                            <h3 className="text-xs font-black uppercase text-gray-400 mb-4">Broadcast System</h3>
+                            <form onSubmit={handleUpdateTicker} className="flex gap-2">
+                                <input name="ticker" className="wa-input" defaultValue={tickerMsg} placeholder="Enter broadcast message..." />
+                                <button className="bg-black text-white px-6 rounded-xl font-bold text-xs">PUSH</button>
+                            </form>
+                        </div>
+
+                        {/* 2. Stats */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-3xl">
+                                <h3 className="text-[10px] font-black uppercase text-gray-400">Total Posts</h3>
+                                <p className="text-4xl font-black text-[var(--wa-teal)] mt-2">{products.length}</p>
+                            </div>
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl">
+                                <h3 className="text-[10px] font-black uppercase text-gray-400">Active</h3>
+                                <p className="text-4xl font-black text-blue-600 mt-2">{products.filter(p => p.click_count < 5).length}</p>
+                            </div>
+                        </div>
+
+                        {/* 3. Actions */}
+                        <button onClick={handleLogout} className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase">End Sovereign Session</button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* ... SELL MODAL, PRO MODAL, LOGIN MODAL (Same as before) ... */}
         {showModal && (
             <div className="fixed inset-0 bg-black/60 z-[100] flex items-end backdrop-blur-sm">
                 <div className="glass-3d w-full p-6 rounded-t-[32px] animate-slide-up max-h-[85vh] overflow-y-auto">
@@ -386,8 +482,6 @@ export default function Marketplace() {
                         </div>
                         <input className="wa-input" placeholder="Title" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
                         <input className="wa-input" type="number" placeholder="Price (₦)" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required />
-                        
-                        {/* 3 IMAGE UPLOAD */}
                         <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center relative tap">
                             <input type="file" accept="image/*" multiple onChange={handleImageSelect} className="absolute inset-0 opacity-0 w-full h-full" />
                             {previewUrls.length > 0 ? (
@@ -398,7 +492,6 @@ export default function Marketplace() {
                                 <p className="text-[9px] font-black text-gray-400 uppercase">Tap to Snap (Max 3)</p>
                             )}
                         </div>
-
                         <input className="wa-input" type="tel" placeholder="WhatsApp (234...)" value={form.whatsapp} onChange={e => setForm({...form, whatsapp: e.target.value})} required />
                         <button disabled={submitting} className="w-full bg-[var(--wa-teal)] text-white py-4 rounded-2xl font-black shadow-xl text-lg uppercase tracking-widest tap">
                             {uploadStatus || "Launch Ad"}
@@ -408,7 +501,6 @@ export default function Marketplace() {
             </div>
         )}
 
-        {/* PRO MODAL */}
         {showProModal && (
             <div className="fixed inset-0 z-[140] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-fade-in">
                 <div className="glass-3d w-full max-w-sm p-8 text-center relative">
@@ -416,7 +508,6 @@ export default function Marketplace() {
                     <div className="text-5xl mb-4">💎</div>
                     <h2 className="text-2xl font-black uppercase text-[var(--wa-teal)] mb-2">Campus Pro</h2>
                     <p className="text-xs font-bold text-gray-400 mb-6">Upgrade your selling power</p>
-                    
                     <div className="space-y-4 text-left mb-8">
                         <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
                             <span className="text-xl">🚀</span>
@@ -433,7 +524,6 @@ export default function Marketplace() {
                             </div>
                         </div>
                     </div>
-
                     <a href="https://wa.me/2347068516779?text=I%20want%20to%20upgrade%20to%20Campus%20PRO" target="_blank" className="block w-full bg-[var(--wa-teal)] text-white py-4 rounded-2xl font-black shadow-xl uppercase tap">
                         Message Admin to Join
                     </a>
@@ -441,7 +531,6 @@ export default function Marketplace() {
             </div>
         )}
 
-        {/* SOVEREIGN LOGIN */}
         {showLogin && (
             <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl">
                  <div className="glass-3d w-full max-w-sm p-8 border-t-4 border-[var(--wa-teal)]">
