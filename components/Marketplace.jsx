@@ -82,6 +82,9 @@ export default function Marketplace() {
   const [broadcasts, setBroadcasts] = useState([]);
   const [clientIp, setClientIp] = useState('0.0.0.0');
   
+  // SYSTEM HEALTH
+  const [systemReport, setSystemReport] = useState(null);
+
   // FORM STATE
   const [postType, setPostType] = useState('sell'); 
   const [form, setForm] = useState({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
@@ -124,6 +127,7 @@ export default function Marketplace() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, (payload) => {
         if(payload.eventType === 'INSERT') setRequests(prev => [payload.new, ...prev]);
         else if (payload.eventType === 'DELETE') setRequests(prev => prev.filter(r => r.id !== payload.old.id));
+        else if (payload.eventType === 'UPDATE') setRequests(prev => prev.map(r => r.id === payload.new.id ? payload.new : r));
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'broadcasts' }, () => {
         fetchBroadcasts();
@@ -201,6 +205,19 @@ export default function Marketplace() {
       window.location.reload();
   };
 
+  // --- QUANT CLEANUP ---
+  const runSystemCleanup = async () => {
+      const { data, error } = await supabase.rpc('run_quant_cleanup');
+      if(error) {
+          alert("Cleanup Failed: " + error.message);
+      } else {
+          setSystemReport(data);
+          // Refresh lists
+          fetchProducts();
+          fetchRequests();
+      }
+  }
+
   // --- ADMIN TOOLS ---
   const handleExpungeProduct = async (id) => {
       if(!confirm("DELETE ITEM?")) return;
@@ -208,10 +225,14 @@ export default function Marketplace() {
   };
   
   const handleVerifyProduct = async (id, currentStatus) => {
-      // Toggle the verified status
       const { error } = await supabase.from('products').update({ is_verified: !currentStatus }).eq('id', id);
       if(error) alert("Update Failed: " + error.message);
   };
+
+  const handleVerifyRequest = async (id, currentStatus) => {
+      const { error } = await supabase.from('requests').update({ is_verified: !currentStatus }).eq('id', id);
+      if(error) alert("Update Failed: " + error.message);
+  }
 
   const handleExpungeRequest = async (id) => {
       if(!confirm("DELETE REQUEST?")) return;
@@ -286,7 +307,7 @@ export default function Marketplace() {
                 is_admin_post: isAdmin,
                 ip_address: clientIp,
                 user_agent: navigator.userAgent,
-                is_verified: false // Default
+                is_verified: false
             }]);
             if (error) throw error;
         } else {
@@ -296,7 +317,8 @@ export default function Marketplace() {
                 whatsapp_number: form.whatsapp.replace(/\D/g, ''),
                 campus: form.campus,
                 image_url: finalImageUrls[0] || null, 
-                ip_address: clientIp
+                ip_address: clientIp,
+                is_verified: false
             }]);
             if (error) throw error;
         }
@@ -450,7 +472,6 @@ export default function Marketplace() {
                                 </div>
                                 {item.images?.length > 1 && <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">{item.images.map((_, i) => <div key={i} className="w-1.5 h-1.5 rounded-full bg-white/80 shadow-sm border border-black/10"></div>)}</div>}
                                 
-                                {/* BADGES */}
                                 {isSold && <div className="absolute inset-0 bg-black/60 flex items-center justify-center"><span className="text-white font-black border-2 px-2 py-1 -rotate-12">SOLD OUT</span></div>}
                                 {item.is_verified && <div className="absolute top-2 right-2 bg-yellow-400 text-black text-[9px] font-black px-2 py-1 rounded-full shadow-lg border border-yellow-200 flex items-center gap-1"><span>🛡️</span>VERIFIED</div>}
                             </div>
@@ -487,17 +508,31 @@ export default function Marketplace() {
                     return (
                         <div key={item.id} className="product-card border-l-4 border-l-[#8E44AD]">
                             <div className="p-5 flex flex-col h-full justify-between">
-                                <div>
+                                <div className="relative">
                                     <div className="flex justify-between items-start mb-2">
                                         <span className="bg-[#8E44AD]/10 text-[#8E44AD] text-[8px] font-black px-2 py-1 rounded uppercase">Request</span>
                                         <span className="text-[8px] font-bold text-gray-300 uppercase">{dist}</span>
                                     </div>
-                                    <h3 className="text-xs font-extrabold uppercase leading-tight mb-2">{item.title}</h3>
+                                    <h3 className="text-xs font-extrabold uppercase leading-tight mb-2 flex items-center gap-1">
+                                        {item.title}
+                                        {item.is_verified && <span className="text-yellow-500 text-sm">✓</span>}
+                                    </h3>
                                     {item.image_url && <img src={item.image_url} className="w-12 h-12 rounded-lg object-cover mb-2 border border-gray-100" />}
                                     <p className="font-black text-sm text-gray-700">Budget: ₦{Number(item.budget).toLocaleString()}</p>
+                                    
+                                    {/* Verification Badge for Requests */}
+                                    {item.is_verified && <div className="absolute top-0 right-0 -mt-1"><span className="text-xl">🛡️</span></div>}
                                 </div>
                                 <button onClick={() => handleFulfillRequest(item)} className="mt-4 block w-full bg-[#8E44AD] text-white text-center py-2.5 rounded-xl text-[10px] font-black uppercase transition tap shadow-md">I Have This</button>
-                                {isAdmin && <button onClick={() => handleExpungeRequest(item.id)} className="text-red-500 text-[8px] mt-2 font-black uppercase text-right block">Remove</button>}
+                                
+                                {isAdmin && (
+                                    <div className="flex gap-2 mt-2">
+                                        <button onClick={() => handleExpungeRequest(item.id)} className="flex-1 bg-red-100 text-red-600 py-1 rounded text-[8px] font-black uppercase">Remove</button>
+                                        <button onClick={() => handleVerifyRequest(item.id, item.is_verified)} className={`flex-1 py-1 rounded text-[8px] font-black uppercase ${item.is_verified ? 'bg-gray-200 text-gray-500' : 'bg-yellow-100 text-yellow-700'}`}>
+                                            {item.is_verified ? 'Un-Verify' : 'Verify'}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     );
@@ -507,7 +542,7 @@ export default function Marketplace() {
 
         <button onClick={() => setShowModal(true)} className="fixed bottom-8 right-6 fab z-50 tap">+</button>
 
-        {/* ... MODALS (Same as previous) ... */}
+        {/* ... MODALS ... */}
         {showModal && (
             <div className="fixed inset-0 bg-black/60 z-[100] flex items-end backdrop-blur-sm">
                 <div className="glass-3d w-full p-6 rounded-t-[32px] animate-slide-up max-h-[85vh] overflow-y-auto">
@@ -557,6 +592,22 @@ export default function Marketplace() {
                         <button onClick={() => setShowAdminPanel(false)} className="text-xs font-bold opacity-50 bg-gray-100 px-3 py-1 rounded-lg">CLOSE</button>
                     </div>
                     <div className="space-y-8">
+                        
+                        {/* 1. QUANT SYSTEM STATUS */}
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-5 rounded-3xl border border-blue-100 dark:border-blue-900">
+                             <h3 className="text-xs font-black uppercase text-blue-500 mb-2">SYSTEM QUANT STATUS</h3>
+                             {systemReport ? (
+                                 <div className="text-[10px] font-mono text-blue-800 dark:text-blue-300">
+                                     <p>STATUS: {systemReport.status}</p>
+                                     <p>PRODUCTS PURGED: {systemReport.products_purged}</p>
+                                     <p>REQUESTS PURGED: {systemReport.requests_purged}</p>
+                                 </div>
+                             ) : (
+                                 <button onClick={runSystemCleanup} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase w-full">RUN SYSTEM CLEANUP</button>
+                             )}
+                        </div>
+
+                        {/* 2. BROADCASTS */}
                         <div className="bg-gray-50 dark:bg-gray-900 p-5 rounded-3xl">
                             <h3 className="text-xs font-black uppercase text-gray-400 mb-4">📢 Active Broadcasts</h3>
                             <div className="space-y-3 mb-4">
@@ -580,7 +631,8 @@ export default function Marketplace() {
                 </div>
             </div>
         )}
-
+        
+        {/* ... Pro Modal, Login Modal (Same) ... */}
         {showProModal && (
             <div className="fixed inset-0 z-[140] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-fade-in">
                 <div className="glass-3d w-full max-w-sm p-8 text-center relative">
