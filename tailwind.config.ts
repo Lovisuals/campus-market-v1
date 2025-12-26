@@ -11,6 +11,20 @@ export default {
   theme: {
     extend: {
       colors: {
+        // --- NEW WhatsApp Native Brand Colors ---
+        wa: {
+          teal: "#008069",   // Original WhatsApp Teal
+          green: "#25D366",  // Bright Action Green
+          dark: "#075E54",   // Deep Chat Green
+          light: "#dcf8c6",  // Bubble Green
+        },
+        // --- Custom Background Aliases ---
+        bg: {
+          main: "var(--bg-main)",
+          card: "var(--bg-card)",
+          input: "var(--bg-input)",
+        },
+        // --- SHADCN Originals (Preserved for compatibility) ---
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
@@ -53,11 +67,20 @@ export default {
         },
       },
       borderRadius: {
+        // High-end mobile rounding
+        xl: "18px",
+        "2xl": "24px",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      boxShadow: {
+        'wa': '0 1px 0.5px rgba(11,20,26,.08)',
+      }
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    require("@tailwindcss/typography"),
+  ],
 } satisfies Config;
