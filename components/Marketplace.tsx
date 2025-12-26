@@ -19,19 +19,21 @@ class ErrorBoundary extends React.Component<any, any> {
     return { hasError: true, error };
   }
   componentDidCatch(error: any, errorInfo: any) {
-    console.error("CRASH:", error, errorInfo);
+    console.error("🚨 CRITICAL SYSTEM FAILURE:", error, errorInfo);
   }
   render() {
     if (this.state.hasError) {
       return (
-        <div className="p-10 bg-red-50 text-red-900 min-h-screen">
-          <h1 className="text-2xl font-bold">⚠️ SYSTEM ERROR</h1>
-          <p className="mt-2">{this.state.error?.toString()}</p>
+        <div className="p-10 bg-red-50 text-red-900 min-h-screen font-mono">
+          <h1 className="text-2xl font-bold">⚠️ SYSTEM ALERT: RENDER FAILURE</h1>
+          <div className="bg-white p-6 rounded-xl border border-red-200 mt-4 shadow-sm">
+            <p className="font-bold text-red-600">{this.state.error?.toString()}</p>
+          </div>
           <button 
             onClick={() => typeof window !== 'undefined' && window.location.reload()} 
-            className="mt-4 bg-red-600 text-white px-6 py-2 rounded-lg font-bold"
+            className="mt-6 bg-red-600 text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest shadow-lg"
           >
-            RELOAD SYSTEM
+            Reboot System
           </button>
         </div>
       );
@@ -42,31 +44,30 @@ class ErrorBoundary extends React.Component<any, any> {
 
 // --- SAFE CONFIG & UTILS ---
 
-// Lazy load Supabase to prevent build-time crashes if env vars are missing
 let supabaseInstance: any = null;
 const getSupabase = () => {
     if (supabaseInstance) return supabaseInstance;
-    
-    // Safety check for build time
-    if (typeof window === 'undefined') return null;
+
+    if (typeof window === 'undefined') {
+        throw new Error('Supabase accessed during SSR/Build Analysis');
+    }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!url || !key) {
-        console.error("Supabase Environment Variables Missing");
-        return null;
+        throw new Error('Missing Supabase Environment Variables');
     }
 
     supabaseInstance = createClient(url, key);
     return supabaseInstance;
 };
 
-// Lazy load Confetti
 const fireConfetti = async () => {
     if (typeof window === 'undefined') return;
     try {
-        const confetti = (await import('canvas-confetti')).default;
+        const confettiModule = await import('canvas-confetti');
+        const confetti = confettiModule.default || confettiModule;
         confetti({
             particleCount: 150,
             spread: 70,
@@ -99,17 +100,19 @@ const compressImage = async (file: File) => {
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                if(!ctx) return;
+                if(!ctx) return resolve(file);
                 const maxWidth = 800; 
-                const scale = maxWidth / img.width;
-                canvas.width = maxWidth;
+                const scale = Math.min(1, maxWidth / img.width);
+                canvas.width = img.width * scale;
                 canvas.height = img.height * scale;
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 canvas.toBlob((blob) => {
-                    if(blob) resolve(blob);
+                    resolve(blob || file);
                 }, 'image/jpeg', 0.8);
             };
+            img.onerror = () => resolve(file);
         };
+        reader.onerror = () => resolve(file);
     });
 };
 
@@ -139,8 +142,8 @@ const ProductCard = ({ item, viewMode, isAdmin, handlers }: any) => {
                 <div className="aspect-square bg-gray-100 dark:bg-gray-800 relative overflow-hidden group">
                     <div ref={scrollRef} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-full h-full">
                          {item.images && item.images.length > 0 ? item.images.map((img: string, idx: number) => (
-                            <img key={idx} src={img} onClick={() => handlers.openLightbox(item, idx)} className="w-full h-full object-cover flex-shrink-0 snap-center cursor-pointer" alt="Item" />
-                        )) : <img src="https://placehold.co/400x400/008069/white?text=No+Photo" className="w-full h-full object-cover" alt="None" />}
+                            <img key={idx} src={img} onClick={() => handlers.openLightbox(item, idx)} className="w-full h-full object-cover flex-shrink-0 snap-center cursor-pointer" alt="Product" />
+                        )) : <img src="https://placehold.co/400x400/008069/white?text=No+Photo" className="w-full h-full object-cover" alt="Placeholder" />}
                     </div>
                     {item.images?.length > 1 && (
                         <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1 z-10">
@@ -175,7 +178,7 @@ const ProductCard = ({ item, viewMode, isAdmin, handlers }: any) => {
                 <div>
                     <div className="flex justify-between items-start mb-2"><span className="bg-[#8E44AD]/10 text-[#8E44AD] text-[7px] font-black px-1.5 py-0.5 rounded uppercase">WANTED</span><span className="text-[8px] font-bold text-gray-400">{item.campus}</span></div>
                     <h3 className="text-[10px] font-bold leading-tight mb-2 line-clamp-2 text-gray-900 dark:text-gray-200">{item.title}</h3>
-                    {item.image_url && <img src={item.image_url} onClick={() => handlers.openLightbox(item, 0)} className="w-8 h-8 rounded-md object-cover mb-2 border border-gray-100 dark:border-gray-700 cursor-pointer" alt="Req" />}
+                    {item.image_url && <img src={item.image_url} onClick={() => handlers.openLightbox(item, 0)} className="w-8 h-8 rounded-md object-cover mb-2 border border-gray-100 dark:border-gray-700 cursor-pointer" alt="Reference" />}
                     <p className="font-black text-xs text-gray-700 dark:text-gray-300">₦{Number(item.budget).toLocaleString()}</p>
                     {item.is_verified && <div className="absolute top-1 right-1"><span className="text-sm">🛡️</span></div>}
                 </div>
@@ -224,31 +227,62 @@ function MarketplaceLogic() {
   const holdTimer = useRef<any>(null);
   const galleryRef = useRef<HTMLDivElement>(null); 
 
+  const fetchProducts = async (client: any) => {
+    if (!client) return;
+    const { data } = await client.from('products').select('*').order('created_at', { ascending: false });
+    if (data) setProducts(data);
+    setLoading(false);
+  };
+
+  const fetchRequests = async (client: any) => {
+    if (!client) return;
+    const { data } = await client.from('requests').select('*').order('created_at', { ascending: false });
+    if (data) setRequests(data);
+  };
+
+  const fetchBroadcasts = async (client: any) => {
+      if (!client) return;
+      const { data } = await client.from('broadcasts').select('*').order('created_at', { ascending: false });
+      if(data) {
+          setBroadcasts(data);
+          const activeMsgs = data.filter((b: any) => b.is_active).map((b: any) => b.message).join(' • ');
+          setTickerMsg(activeMsgs || "CAMPUS MARKETPLACE");
+      }
+  }
+
+  const checkAdminSession = async (client: any) => {
+      if (!client) return;
+      const { data: { session } } = await client.auth.getSession();
+      if (session) setIsAdmin(true);
+  };
+
   useEffect(() => {
-    // 1. Guard Window access
     if (typeof window !== 'undefined') {
         const savedTheme = localStorage.getItem('sentinel_theme');
         if (savedTheme === 'dark') {
             setDarkMode(true);
             document.body.classList.add('dark-mode');
             document.documentElement.classList.add('dark'); 
-        } else {
-            setDarkMode(false);
-            document.body.classList.remove('dark-mode');
-            document.documentElement.classList.remove('dark');
-            localStorage.setItem('sentinel_theme', 'light');
         }
-        
-        fetch('https://api.ipify.org?format=json').then(res => res.json()).then(data => setClientIp(data.ip)).catch(() => {});
+        try {
+            fetch('https://api.ipify.org?format=json').then(res => res.json()).then(data => setClientIp(data.ip)).catch(() => {});
+        } catch (e) {}
     }
 
-    // 2. Safe Supabase Call
-    const client = getSupabase();
+    let client: any;
+    try {
+        client = getSupabase();
+    } catch (err) {
+        console.warn("Supabase init skipped (likely build-time)");
+        return;
+    }
+
     if (!client) return;
 
-    fetchProducts();
-    fetchRequests();
-    fetchBroadcasts();
+    fetchProducts(client);
+    fetchRequests(client);
+    fetchBroadcasts(client);
+    checkAdminSession(client);
     
     const channel = client.channel('realtime_feed')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload: any) => {
@@ -263,51 +297,16 @@ function MarketplaceLogic() {
     })
     .subscribe();
 
-    return () => { client.removeChannel(channel); }
+    return () => { 
+        if (channel) client.removeChannel(channel); 
+    } 
   }, []);
 
   useEffect(() => {
-      checkAdminSession();
-  }, []);
-
-  useEffect(() => {
-      if (lightboxData && galleryRef.current && lightboxData.startIndex > 0) {
+      if (typeof window !== 'undefined' && lightboxData && galleryRef.current && lightboxData.startIndex > 0) {
           galleryRef.current.scrollLeft = window.innerWidth * lightboxData.startIndex;
       }
   }, [lightboxData]);
-
-  const checkAdminSession = async () => {
-      const client = getSupabase();
-      if (!client) return;
-      const { data: { session } } = await client.auth.getSession();
-      if (session) setIsAdmin(true);
-  };
-
-  const fetchBroadcasts = async () => {
-      const client = getSupabase();
-      if (!client) return;
-      const { data } = await client.from('broadcasts').select('*').order('created_at', { ascending: false });
-      if(data) {
-          setBroadcasts(data);
-          const activeMsgs = data.filter((b: any) => b.is_active).map((b: any) => b.message).join(' • ');
-          setTickerMsg(activeMsgs || "CAMPUS MARKETPLACE");
-      }
-  }
-
-  const fetchProducts = async () => {
-    const client = getSupabase();
-    if (!client) return;
-    const { data } = await client.from('products').select('*').order('created_at', { ascending: false });
-    if (data) setProducts(data);
-    setLoading(false);
-  };
-
-  const fetchRequests = async () => {
-    const client = getSupabase();
-    if (!client) return;
-    const { data } = await client.from('requests').select('*').order('created_at', { ascending: false });
-    if (data) setRequests(data);
-  };
 
   const toggleTheme = () => {
       const newMode = !darkMode;
@@ -337,7 +336,10 @@ function MarketplaceLogic() {
       },
       handleExpungeProduct: async (id: any) => { 
           const client = getSupabase();
-          if(confirm("DELETE ITEM?") && client) await client.from('products').delete().eq('id', id); 
+          if (!client) return;
+          if (typeof window !== 'undefined' && window.confirm("DELETE ITEM?")) {
+              await client.from('products').delete().eq('id', id); 
+          }
       },
       handleVerifyProduct: async (id: any, status: boolean) => { 
           const client = getSupabase();
@@ -345,7 +347,10 @@ function MarketplaceLogic() {
       },
       handleExpungeRequest: async (id: any) => { 
           const client = getSupabase();
-          if(confirm("DELETE REQUEST?") && client) await client.from('requests').delete().eq('id', id); 
+          if (!client) return;
+          if (typeof window !== 'undefined' && window.confirm("DELETE REQUEST?")) {
+              await client.from('requests').delete().eq('id', id); 
+          }
       },
       handleVerifyRequest: async (id: any, status: boolean) => { 
           const client = getSupabase();
@@ -362,7 +367,7 @@ function MarketplaceLogic() {
     setSubmitting(true);
     const client = getSupabase();
     if (!client) {
-        alert("System not ready. Refresh.");
+        alert("Database connection not ready. Refresh.");
         setSubmitting(false);
         return;
     }
@@ -390,6 +395,8 @@ function MarketplaceLogic() {
             if (quota.date === today && quota.count >= dailyLimit) { alert(`Daily Limit Reached!`); setSubmitting(false); return; }
         }
 
+        const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown';
+
         let finalImageUrls = [];
         if (imageFiles.length > 0) {
             setUploadStatus('Uploading...');
@@ -407,7 +414,7 @@ function MarketplaceLogic() {
         setUploadStatus('Publishing...');
         const table = postType === 'sell' ? 'products' : 'requests';
         const payload = postType === 'sell' 
-            ? { title: form.title, price: form.price, whatsapp_number: finalPhone, campus: form.campus, item_type: form.type, images: finalImageUrls.length > 0 ? finalImageUrls : ["https://placehold.co/600x600/008069/white?text=No+Photo"], is_admin_post: isAdmin, ip_address: clientIp, user_agent: navigator.userAgent, is_verified: false }
+            ? { title: form.title, price: form.price, whatsapp_number: finalPhone, campus: form.campus, item_type: form.type, images: finalImageUrls.length > 0 ? finalImageUrls : ["https://placehold.co/600x600/008069/white?text=No+Photo"], is_admin_post: isAdmin, ip_address: clientIp, user_agent: userAgent, is_verified: false }
             : { title: form.title, budget: form.price, whatsapp_number: finalPhone, campus: form.campus, image_url: finalImageUrls[0] || null, ip_address: clientIp, is_verified: false };
         
         const { error } = await client.from(table).insert([payload]);
@@ -420,11 +427,11 @@ function MarketplaceLogic() {
             localStorage.setItem('post_quota', JSON.stringify({ date: today, count: newCount }));
         }
 
-        await fireConfetti(); // LAZY LOADED
+        await fireConfetti(); 
         setShowModal(false);
         setForm({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
         setImageFiles([]); setPreviewUrls([]);
-        fetchProducts(); fetchRequests();
+        fetchProducts(client); fetchRequests(client);
     } catch (err: any) { alert("Error: " + err.message); } finally { setSubmitting(false); setUploadStatus(''); }
   };
 
@@ -438,12 +445,51 @@ function MarketplaceLogic() {
 
   const handleLogoTouchStart = () => { holdTimer.current = setTimeout(() => { if (typeof window !== 'undefined' && navigator.vibrate) navigator.vibrate(200); setShowLogin(true); }, 2000); };
   const handleLogoTouchEnd = () => clearTimeout(holdTimer.current);
-  const handleAdminLogin = async (e: any) => { e.preventDefault(); const client = getSupabase(); if(!client) return; const { error } = await client.auth.signInWithPassword({ email: e.target.email.value, password: e.target.password.value }); if (!error) { setIsAdmin(true); setShowLogin(false); setShowAdminPanel(true); } else { alert("Access Denied"); } };
-  const handleLogout = async () => { const client = getSupabase(); if(client) await client.auth.signOut(); setIsAdmin(false); setShowAdminPanel(false); window.location.reload(); };
-  const runSystemCleanup = async () => { const client = getSupabase(); if(!client) return; const { data, error } = await client.rpc('run_quant_cleanup'); if(error) { alert("Cleanup Failed: " + error.message); } else { setSystemReport(data); fetchProducts(); fetchRequests(); } };
-  const handleAddBroadcast = async (e: any) => { e.preventDefault(); const client = getSupabase(); if(!client) return; const msg = e.target.message.value; if(!msg) return; await client.from('broadcasts').insert([{ message: msg, is_active: true }]); e.target.reset(); };
-  const toggleBroadcast = async (id: any, currentStatus: boolean) => { const client = getSupabase(); if(client) await client.from('broadcasts').update({ is_active: !currentStatus }).eq('id', id); };
-  const deleteBroadcast = async (id: any) => { const client = getSupabase(); if(confirm("Delete?") && client) { await client.from('broadcasts').delete().eq('id', id); } };
+  
+  const handleAdminLogin = async (e: any) => { 
+      e.preventDefault(); 
+      const client = getSupabase(); 
+      if(!client) return; 
+      const { error } = await client.auth.signInWithPassword({ email: e.target.email.value, password: e.target.password.value }); 
+      if (!error) { setIsAdmin(true); setShowLogin(false); setShowAdminPanel(true); } else { alert("Access Denied"); } 
+  };
+
+  const handleLogout = async () => { 
+      const client = getSupabase(); 
+      if(client) await client.auth.signOut(); 
+      setIsAdmin(false); 
+      setShowAdminPanel(false); 
+      if(typeof window !== 'undefined') window.location.reload(); 
+  };
+
+  const runSystemCleanup = async () => { 
+      const client = getSupabase(); 
+      if(!client) return; 
+      const { data, error } = await client.rpc('run_quant_cleanup'); 
+      if(error) { alert("Cleanup Failed: " + error.message); } else { setSystemReport(data); fetchProducts(client); fetchRequests(client); } 
+  };
+
+  const handleAddBroadcast = async (e: any) => { 
+      e.preventDefault(); 
+      const client = getSupabase(); 
+      if(!client) return; 
+      const msg = e.target.message.value; 
+      if(!msg) return; 
+      await client.from('broadcasts').insert([{ message: msg, is_active: true }]); 
+      e.target.reset(); 
+  };
+
+  const toggleBroadcast = async (id: any, currentStatus: boolean) => { 
+      const client = getSupabase(); 
+      if(client) await client.from('broadcasts').update({ is_active: !currentStatus }).eq('id', id); 
+  };
+
+  const deleteBroadcast = async (id: any) => { 
+      const client = getSupabase(); 
+      if (client && typeof window !== 'undefined' && window.confirm("Delete?")) { 
+          await client.from('broadcasts').delete().eq('id', id); 
+      } 
+  };
 
   const filterList = (list: any[]) => {
       return list.filter(item => {
@@ -457,7 +503,7 @@ function MarketplaceLogic() {
   let displayItems = viewMode === 'market' ? filterList(products) : filterList(requests);
   
   return (
-    <div className="min-h-screen pb-32 transition-colors duration-300 dark:bg-black">
+    <div className="min-h-screen pb-32 transition-colors duration-300 dark:bg-black font-sans">
         <div className="ticker-container"><div className="ticker-content"><span id="adText" className="text-[var(--wa-neon)] font-black text-[10px] uppercase tracking-widest">{tickerMsg}</span></div></div>
         <header className="sticky top-0 z-50 bg-[var(--wa-chat-bg)] dark:bg-black/90 border-b border-[var(--border)] pt-safe noselect shadow-sm backdrop-blur-md">
             <div className="px-5 py-4 flex justify-between items-center">
@@ -566,7 +612,7 @@ function MarketplaceLogic() {
                 <div ref={galleryRef} className="flex overflow-x-auto snap-x snap-mandatory w-full h-full items-center scrollbar-hide">
                     {lightboxData.images.map((img: string, i: number) => (
                         <div key={i} className="w-screen h-screen flex-shrink-0 snap-center flex items-center justify-center p-1">
-                            <img src={img} className="max-w-full max-h-full object-contain" alt="Gallery" />
+                            <img src={img} className="max-w-full max-h-full object-contain" alt="Gallery View" />
                         </div>
                     ))}
                 </div>
@@ -583,7 +629,7 @@ function MarketplaceLogic() {
   );
 }
 
-// WRAPPER TO CATCH ERRORS
+// WRAPPER
 export default function Marketplace() {
     return <ErrorBoundary><MarketplaceLogic /></ErrorBoundary>;
 }
