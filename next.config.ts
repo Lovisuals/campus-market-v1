@@ -2,31 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  
-  // 1. IGNORE ESLINT ERRORS (The Style Police)
-  // This stops the build from failing if you have unused variables
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-
-  // 2. IGNORE TYPESCRIPT ERRORS (The Syntax Police)
-  // This is crucial. It tells the server "Deploy even if there are type errors"
+  // We removed the 'eslint' object here because Next.js 15 handles it differently
   typescript: {
     ignoreBuildErrors: true,
   },
-
-  // 3. IMAGE CONFIGURATION
-  // Allows images from Supabase and Placeholders without crashing
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
-    ],
-    unoptimized: true, // Fixes mobile image loading issues
+    unoptimized: true,
   },
 };
 
 export default nextConfig;
-
