@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import confetti from 'canvas-confetti';
-import ProductCard from './ProductCard'; // <--- IMPORTING THE VISUALS
+import ProductCard from './ProductCard'; 
 
 // --- CONFIGURATION ---
 const supabase = createClient(
@@ -68,7 +68,7 @@ export default function Marketplace() {
   const [products, setProducts] = useState([]);
   const [requests, setRequests] = useState([]); 
   const [viewMode, setViewMode] = useState('market'); 
-  const [fullscreenImg, setFullscreenImg] = useState(null);
+  const [lightboxData, setLightboxData] = useState(null); 
   
   const [loading, setLoading] = useState(true);
   const [activeCampus, setActiveCampus] = useState('All');
@@ -84,7 +84,6 @@ export default function Marketplace() {
   const [clientIp, setClientIp] = useState('0.0.0.0');
   const [systemReport, setSystemReport] = useState(null);
 
-  // FORM STATE
   const [postType, setPostType] = useState('sell'); 
   const [form, setForm] = useState({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
   const [imageFiles, setImageFiles] = useState([]);
@@ -94,6 +93,7 @@ export default function Marketplace() {
 
   const logoRef = useRef(null);
   const holdTimer = useRef(null);
+  const galleryRef = useRef(null); 
 
   // --- INIT ---
   useEffect(() => {
@@ -101,10 +101,17 @@ export default function Marketplace() {
     fetchRequests();
     fetchBroadcasts();
 
+    // FORCE LIGHT MODE DEFAULT unless 'dark' is explicitly saved
     const savedTheme = localStorage.getItem('sentinel_theme');
     if (savedTheme === 'dark') {
         setDarkMode(true);
         document.body.classList.add('dark-mode');
+        document.documentElement.classList.add('dark'); 
+    } else {
+        setDarkMode(false);
+        document.body.classList.remove('dark-mode');
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('sentinel_theme', 'light');
     }
 
     fetch('https://api.ipify.org?format=json').then(res => res.json()).then(data => setClientIp(data.ip)).catch(() => {});
@@ -136,6 +143,13 @@ export default function Marketplace() {
     return () => { supabase.removeChannel(channel); }
   }, []);
 
+  // --- LIGHTBOX SCROLL EFFECT ---
+  useEffect(() => {
+      if (lightboxData && galleryRef.current && lightboxData.startIndex > 0) {
+          galleryRef.current.scrollLeft = window.innerWidth * lightboxData.startIndex;
+      }
+  }, [lightboxData]);
+
   const checkAdminSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) setIsAdmin(true);
@@ -166,14 +180,16 @@ export default function Marketplace() {
       setDarkMode(newMode);
       if(newMode) {
           document.body.classList.add('dark-mode');
+          document.documentElement.classList.add('dark'); 
           localStorage.setItem('sentinel_theme', 'dark');
       } else {
           document.body.classList.remove('dark-mode');
+          document.documentElement.classList.remove('dark'); 
           localStorage.setItem('sentinel_theme', 'light');
       }
   };
 
-  // --- HANDLERS (Passed to Card) ---
+  // --- HANDLERS ---
   const handleBuyClick = async (product) => {
       window.open(`https://wa.me/${product.whatsapp_number}`, '_blank');
       if(!isAdmin) await supabase.rpc('increment_clicks', { row_id: product.id });
@@ -198,6 +214,13 @@ export default function Marketplace() {
       const { error } = await supabase.from('requests').update({ is_verified: !currentStatus }).eq('id', id);
       if(error) alert("Update Failed: " + error.message);
   }
+
+  const openLightbox = (item, index) => {
+      const imgs = item.images || (item.image_url ? [item.image_url] : []);
+      if (imgs.length > 0) {
+          setLightboxData({ images: imgs, startIndex: index });
+      }
+  };
 
   // --- ACTIONS ---
   const handleLogoTouchStart = () => {
@@ -241,7 +264,6 @@ export default function Marketplace() {
       }
   }
 
-  // --- BROADCASTS ---
   const handleAddBroadcast = async (e) => {
       e.preventDefault();
       const msg = e.target.message.value;
@@ -365,6 +387,16 @@ export default function Marketplace() {
       }
   };
 
+  const itemHandlers = {
+      handleBuyClick,
+      handleFulfillRequest,
+      handleExpungeProduct,
+      handleVerifyProduct,
+      handleExpungeRequest,
+      handleVerifyRequest,
+      openLightbox 
+  };
+
   // --- RENDER ---
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -387,19 +419,8 @@ export default function Marketplace() {
       });
   }
 
-  // Group handlers to pass to child
-  const itemHandlers = {
-      handleBuyClick,
-      handleFulfillRequest,
-      handleExpungeProduct,
-      handleVerifyProduct,
-      handleExpungeRequest,
-      handleVerifyRequest,
-      setFullscreenImg
-  };
-
   return (
-    <div className="min-h-screen pb-32 transition-colors duration-300">
+    <div className="min-h-screen pb-32 transition-colors duration-300 dark:bg-black">
         {/* TICKER */}
         <div className="ticker-container">
             <div className="ticker-content">
@@ -408,7 +429,7 @@ export default function Marketplace() {
         </div>
 
         {/* HEADER */}
-        <header className="sticky top-0 z-50 bg-[var(--wa-chat-bg)] border-b border-[var(--border)] pt-safe noselect shadow-sm">
+        <header className="sticky top-0 z-50 bg-[var(--wa-chat-bg)] dark:bg-black/90 border-b border-[var(--border)] pt-safe noselect shadow-sm backdrop-blur-md">
             <div className="px-5 py-4 flex justify-between items-center">
                 <div 
                     ref={logoRef} 
@@ -422,11 +443,11 @@ export default function Marketplace() {
                     {isAdmin && <span className="text-[8px] text-yellow-500 font-black uppercase bg-yellow-100 px-1 rounded ml-1">Sovereign Active</span>}
                 </div>
                 <div className="flex gap-3">
-                    <button onClick={toggleTheme} className="w-10 h-10 flex items-center justify-center rounded-2xl bg-[var(--surface)] shadow-sm tap">
+                    <button onClick={toggleTheme} className="w-10 h-10 flex items-center justify-center rounded-2xl bg-[var(--surface)] dark:bg-gray-800 shadow-sm tap">
                         {darkMode ? '☀️' : '🌙'}
                     </button>
                     {isAdmin ? (
-                        <button onClick={() => setShowAdminPanel(true)} className="bg-black text-white px-5 py-2.5 rounded-2xl text-[10px] font-black shadow-lg tap">COMMAND</button>
+                        <button onClick={() => setShowAdminPanel(true)} className="bg-black dark:bg-white dark:text-black text-white px-5 py-2.5 rounded-2xl text-[10px] font-black shadow-lg tap">COMMAND</button>
                     ) : (
                         <button onClick={() => setShowProModal(true)} className="bg-[var(--wa-teal)] text-white px-5 py-2.5 rounded-2xl text-[10px] font-black shadow-lg tap">PRO</button>
                     )}
@@ -434,27 +455,27 @@ export default function Marketplace() {
             </div>
 
             <div className="px-5 pb-2 flex gap-2">
-                <button onClick={() => setViewMode('market')} className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'market' ? 'bg-[var(--wa-teal)] text-white shadow-lg' : 'bg-[var(--surface)] text-gray-400'}`}>Items For Sale</button>
-                <button onClick={() => setViewMode('requests')} className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'requests' ? 'bg-[#8E44AD] text-white shadow-lg' : 'bg-[var(--surface)] text-gray-400'}`}>Request Board</button>
+                <button onClick={() => setViewMode('market')} className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'market' ? 'bg-[var(--wa-teal)] text-white shadow-lg' : 'bg-[var(--surface)] dark:bg-gray-800 text-gray-400'}`}>Items For Sale</button>
+                <button onClick={() => setViewMode('requests')} className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'requests' ? 'bg-[#8E44AD] text-white shadow-lg' : 'bg-[var(--surface)] dark:bg-gray-800 text-gray-400'}`}>Request Board</button>
             </div>
 
              <div className="px-5 pb-3 flex gap-3 overflow-x-auto scrollbar-hide pt-2">
                 {CAMPUSES.map(c => (
-                    <button key={c.id} onClick={() => setActiveCampus(c.id)} className={`flex-none px-5 py-2 rounded-full text-[10px] font-black border transition tap ${activeCampus === c.id ? 'bg-[var(--wa-teal)] text-white border-transparent' : 'border-gray-200 text-gray-400'}`}>
+                    <button key={c.id} onClick={() => setActiveCampus(c.id)} className={`flex-none px-5 py-2 rounded-full text-[10px] font-black border transition tap ${activeCampus === c.id ? 'bg-[var(--wa-teal)] text-white border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-400'}`}>
                         {c.name}
                     </button>
                 ))}
             </div>
             
             <div className="px-5 py-3">
-                <div className="search-container">
+                <div className="search-container dark:bg-gray-800">
                     <span className="opacity-20 text-sm mr-3">🔍</span>
-                    <input className="flex-1 bg-transparent py-3 text-[13px] font-semibold outline-none wa-input" placeholder={viewMode === 'market' ? "Search items..." : "Search requests..."} onChange={(e) => setSearchTerm(e.target.value)} />
+                    <input className="flex-1 bg-transparent py-3 text-[13px] font-semibold outline-none wa-input dark:text-white" placeholder={viewMode === 'market' ? "Search items..." : "Search requests..."} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
             </div>
         </header>
 
-        {/* FEED (2-COLUMN GRID) */}
+        {/* FEED */}
         <main id="feed" className="grid grid-cols-2 gap-3 px-4 pb-20">
             {loading ? <p className="col-span-2 text-center py-10 opacity-40">Loading...</p> : 
              displayItems.length === 0 ? <p className="col-span-2 text-center py-10 opacity-40 text-sm font-bold">No items found here yet.</p> :
@@ -473,29 +494,29 @@ export default function Marketplace() {
 
         <button onClick={() => setShowModal(true)} className="fixed bottom-8 right-6 fab z-50 tap">+</button>
 
-        {/* ... MODALS (Posting, Admin, Pro, Login, Fullscreen) ... */}
+        {/* MODALS */}
         {showModal && (
             <div className="fixed inset-0 bg-black/60 z-[100] flex items-end backdrop-blur-sm">
-                <div className="glass-3d w-full p-6 rounded-t-[32px] animate-slide-up max-h-[85vh] overflow-y-auto">
-                    <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-2xl">
-                        <button onClick={() => setPostType('sell')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition ${postType === 'sell' ? 'bg-white text-[var(--wa-teal)] shadow-sm' : 'text-gray-400'}`}>I want to Sell</button>
-                        <button onClick={() => setPostType('request')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition ${postType === 'request' ? 'bg-white text-[#8E44AD] shadow-sm' : 'text-gray-400'}`}>I want to Buy</button>
+                <div className="glass-3d w-full p-6 rounded-t-[32px] animate-slide-up max-h-[85vh] overflow-y-auto dark:bg-gray-900">
+                    <div className="flex gap-2 mb-6 bg-gray-100 dark:bg-gray-800 p-1 rounded-2xl">
+                        <button onClick={() => setPostType('sell')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition ${postType === 'sell' ? 'bg-white dark:bg-gray-700 text-[var(--wa-teal)] shadow-sm' : 'text-gray-400'}`}>I want to Sell</button>
+                        <button onClick={() => setPostType('request')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition ${postType === 'request' ? 'bg-white dark:bg-gray-700 text-[#8E44AD] shadow-sm' : 'text-gray-400'}`}>I want to Buy</button>
                     </div>
                     <form onSubmit={handlePost} className="space-y-4">
                         <div className="grid grid-cols-2 gap-3">
-                             <select className="wa-input" value={form.campus} onChange={e => setForm({...form, campus: e.target.value})}>
+                             <select className="wa-input dark:bg-gray-800 dark:text-white" value={form.campus} onChange={e => setForm({...form, campus: e.target.value})}>
                                 {CAMPUSES.filter(c => c.id !== 'All').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                             {postType === 'sell' && (
-                                <select className="wa-input" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
+                                <select className="wa-input dark:bg-gray-800 dark:text-white" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
                                     <option value="Physical">📦 Physical</option>
                                     <option value="Digital">⚡ Digital</option>
                                 </select>
                             )}
                         </div>
-                        <input className="wa-input" placeholder={postType === 'sell' ? "What are you selling?" : "What do you need?"} value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
-                        <input className="wa-input" type="number" placeholder={postType === 'sell' ? "Price (₦)" : "Your Budget (₦)"} value={form.price} onChange={e => setForm({...form, price: e.target.value})} required />
-                        <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center relative tap">
+                        <input className="wa-input dark:bg-gray-800 dark:text-white" placeholder={postType === 'sell' ? "What are you selling?" : "What do you need?"} value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
+                        <input className="wa-input dark:bg-gray-800 dark:text-white" type="number" placeholder={postType === 'sell' ? "Price (₦)" : "Your Budget (₦)"} value={form.price} onChange={e => setForm({...form, price: e.target.value})} required />
+                        <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-2xl p-6 text-center relative tap">
                             <input type="file" accept="image/*" multiple onChange={handleImageSelect} className="absolute inset-0 opacity-0 w-full h-full" />
                             {previewUrls.length > 0 ? (
                                 <div className="flex gap-2 justify-center overflow-x-auto">
@@ -505,7 +526,7 @@ export default function Marketplace() {
                                 <p className="text-[9px] font-black text-gray-400 uppercase">{postType === 'sell' ? "Tap to Snap (Max 3)" : "Optional Reference Photo"}</p>
                             )}
                         </div>
-                        <input className="wa-input" type="tel" placeholder="WhatsApp (234...)" value={form.whatsapp} onChange={e => setForm({...form, whatsapp: e.target.value})} required />
+                        <input className="wa-input dark:bg-gray-800 dark:text-white" type="tel" placeholder="WhatsApp (234...)" value={form.whatsapp} onChange={e => setForm({...form, whatsapp: e.target.value})} required />
                         <button disabled={submitting} className={`w-full text-white py-4 rounded-2xl font-black shadow-xl text-lg uppercase tracking-widest tap ${postType === 'sell' ? 'bg-[var(--wa-teal)]' : 'bg-[#8E44AD]'}`}>
                             {uploadStatus || (postType === 'sell' ? "Launch Ad" : "Post Request")}
                         </button>
@@ -542,15 +563,15 @@ export default function Marketplace() {
                                     <div key={b.id} className="flex items-center justify-between bg-white dark:bg-black p-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
                                         <span className={`text-xs font-bold ${!b.is_active && 'opacity-30 line-through'}`}>{b.message}</span>
                                         <div className="flex items-center gap-2">
-                                            <button onClick={() => toggleBroadcast(b.id, b.is_active)} className="text-xl tap">{b.is_active ? '👁️' : '🚫'}</button>
-                                            <button onClick={() => deleteBroadcast(b.id)} className="text-xl opacity-30 hover:opacity-100 tap">🗑️</button>
+                                            <button onClick={() => toggleBroadcast(b.id, b.is_active)} className="text-xl tap dark:text-white">{b.is_active ? '👁️' : '🚫'}</button>
+                                            <button onClick={() => deleteBroadcast(b.id)} className="text-xl opacity-30 hover:opacity-100 tap dark:text-white">🗑️</button>
                                         </div>
                                     </div>
                                 ))}
                             </div>
                             <form onSubmit={handleAddBroadcast} className="flex gap-2">
-                                <input name="message" className="wa-input" placeholder="New Alert..." required />
-                                <button className="bg-black text-white px-4 rounded-xl font-bold text-xs">ADD</button>
+                                <input name="message" className="wa-input dark:bg-gray-800 dark:text-white" placeholder="New Alert..." required />
+                                <button className="bg-black dark:bg-white dark:text-black text-white px-4 rounded-xl font-bold text-xs">ADD</button>
                             </form>
                         </div>
                         <button onClick={handleLogout} className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase">End Sovereign Session</button>
@@ -561,8 +582,8 @@ export default function Marketplace() {
         
         {showProModal && (
             <div className="fixed inset-0 z-[140] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-fade-in">
-                <div className="glass-3d w-full max-w-sm p-8 text-center relative">
-                    <button onClick={() => setShowProModal(false)} className="absolute top-4 right-4 text-2xl opacity-50 tap">×</button>
+                <div className="glass-3d w-full max-w-sm p-8 text-center relative dark:bg-gray-900">
+                    <button onClick={() => setShowProModal(false)} className="absolute top-4 right-4 text-2xl opacity-50 tap dark:text-white">×</button>
                     <div className="text-5xl mb-4">💎</div>
                     <h2 className="text-2xl font-black uppercase text-[var(--wa-teal)] mb-2">Campus Pro</h2>
                     <p className="text-xs font-bold text-gray-400 mb-6">Upgrade your selling power</p>
@@ -573,11 +594,11 @@ export default function Marketplace() {
 
         {showLogin && (
             <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl">
-                 <div className="glass-3d w-full max-w-sm p-8 border-t-4 border-[var(--wa-teal)]">
-                    <h2 className="text-xl font-black uppercase text-center mb-6">Sovereign Entry</h2>
+                 <div className="glass-3d w-full max-w-sm p-8 border-t-4 border-[var(--wa-teal)] dark:bg-gray-900">
+                    <h2 className="text-xl font-black uppercase text-center mb-6 dark:text-white">Sovereign Entry</h2>
                     <form onSubmit={handleAdminLogin} className="space-y-4">
-                        <input name="email" className="wa-input" placeholder="ID" />
-                        <input name="password" type="password" className="wa-input" placeholder="Key" />
+                        <input name="email" className="wa-input dark:bg-gray-800 dark:text-white" placeholder="ID" />
+                        <input name="password" type="password" className="wa-input dark:bg-gray-800 dark:text-white" placeholder="Key" />
                         <button className="w-full bg-[var(--wa-teal)] text-white py-3 rounded-xl font-black uppercase tap">Authenticate</button>
                         <button type="button" onClick={() => setShowLogin(false)} className="w-full text-[10px] font-bold text-gray-500 py-2 uppercase tap">Abort</button>
                     </form>
@@ -585,11 +606,37 @@ export default function Marketplace() {
             </div>
         )}
 
-        {/* LIGHTBOX MODAL */}
-        {fullscreenImg && (
-            <div className="fixed inset-0 z-[300] bg-black flex items-center justify-center animate-fade-in">
-                <button onClick={() => setFullscreenImg(null)} className="absolute top-5 right-5 text-white text-3xl font-bold bg-white/10 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md z-50 tap">×</button>
-                <img src={fullscreenImg} className="max-w-screen max-h-screen object-contain" />
+        {/* --- TIKTOK STYLE LIGHTBOX GALLERY --- */}
+        {lightboxData && (
+            <div className="fixed inset-0 z-[300] bg-black flex flex-col animate-fade-in">
+                {/* Close Button */}
+                <button 
+                    onClick={() => setLightboxData(null)} 
+                    className="absolute top-5 right-5 text-white text-3xl font-bold bg-white/10 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md z-50 tap shadow-lg"
+                >
+                    ×
+                </button>
+                
+                {/* Scrollable Container */}
+                <div 
+                    ref={galleryRef}
+                    className="flex overflow-x-auto snap-x snap-mandatory w-full h-full items-center scrollbar-hide"
+                >
+                    {lightboxData.images.map((img, i) => (
+                        <div key={i} className="w-screen h-screen flex-shrink-0 snap-center flex items-center justify-center p-1">
+                            <img src={img} className="max-w-full max-h-full object-contain" />
+                        </div>
+                    ))}
+                </div>
+
+                {/* Dots Indicator (If multiple) */}
+                {lightboxData.images.length > 1 && (
+                    <div className="absolute bottom-10 left-0 right-0 flex justify-center gap-2">
+                        {lightboxData.images.map((_, i) => (
+                            <div key={i} className={`w-2 h-2 rounded-full ${i === lightboxData.startIndex ? 'bg-white' : 'bg-white/30'}`}></div>
+                        ))}
+                    </div>
+                )}
             </div>
         )}
     </div>
