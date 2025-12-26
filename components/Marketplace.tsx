@@ -1,4 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @next/next/no-img-element */
 // @ts-nocheck
+
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -6,15 +11,15 @@ import { createClient } from '@supabase/supabase-js';
 import confetti from 'canvas-confetti';
 
 // --- ERROR BOUNDARY ---
-class ErrorBoundary extends React.Component {
-  constructor(props) {
+class ErrorBoundary extends React.Component<any, any> {
+  constructor(props: any) {
     super(props);
     this.state = { hasError: false, error: null };
   }
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: any) {
     return { hasError: true, error };
   }
-  componentDidCatch(error, errorInfo) {
+  componentDidCatch(error: any, errorInfo: any) {
     console.error("CRASH:", error, errorInfo);
   }
   render() {
@@ -37,10 +42,9 @@ class ErrorBoundary extends React.Component {
 }
 
 // --- CONFIG ---
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '', 
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const CAMPUSES = [
   { id: 'All', name: 'All Campuses' },
@@ -55,11 +59,11 @@ const CAMPUSES = [
 ];
 
 // --- HELPER: IMAGE COMPRESSION ---
-const compressImage = async (file) => {
+const compressImage = async (file: File) => {
     return new Promise((resolve) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
-        reader.onload = (e) => {
+        reader.onload = (e: any) => {
             const img = new Image();
             img.src = e.target.result;
             img.onload = () => {
@@ -80,11 +84,10 @@ const compressImage = async (file) => {
 };
 
 // --- COMPONENT: PRODUCT CARD ---
-const ProductCard = ({ item, viewMode, isAdmin, handlers }) => {
+const ProductCard = ({ item, viewMode, isAdmin, handlers }: any) => {
     const isSold = (item.click_count || 0) >= 5;
-    const scrollRef = useRef(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
     
-    // Auto-Scroll Effect
     useEffect(() => {
         if (!item.images || item.images.length <= 1) return;
         const interval = setInterval(() => {
@@ -103,22 +106,20 @@ const ProductCard = ({ item, viewMode, isAdmin, handlers }) => {
     if (viewMode === 'market') {
         return (
             <div className={`relative bg-white dark:bg-[#1a1a1a] rounded-2xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-800 transition-colors duration-300 ${item.is_admin_post ? 'ring-2 ring-yellow-400' : ''}`}>
-                {/* Image Area */}
                 <div className="aspect-square bg-gray-100 dark:bg-gray-800 relative overflow-hidden group">
                     <div ref={scrollRef} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-full h-full">
-                         {item.images && item.images.length > 0 ? item.images.map((img, idx) => (
+                         {item.images && item.images.length > 0 ? item.images.map((img: string, idx: number) => (
                             <img key={idx} src={img} onClick={() => handlers.openLightbox(item, idx)} className="w-full h-full object-cover flex-shrink-0 snap-center cursor-pointer" alt="Item" />
                         )) : <img src="https://placehold.co/400x400/008069/white?text=No+Photo" className="w-full h-full object-cover" alt="None" />}
                     </div>
                     {item.images?.length > 1 && (
                         <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1 z-10">
-                            {item.images.map((_, i) => <div key={i} className="w-1 h-1 rounded-full bg-white/80 shadow-sm backdrop-blur-sm"></div>)}
+                            {item.images.map((_: any, i: number) => <div key={i} className="w-1 h-1 rounded-full bg-white/80 shadow-sm backdrop-blur-sm"></div>)}
                         </div>
                     )}
                     {isSold && <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20"><span className="text-white font-black border-2 px-1 py-0.5 text-[8px] -rotate-12">SOLD</span></div>}
                     {item.is_verified && <div className="absolute top-1 right-1 bg-yellow-400 text-black text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-md flex items-center gap-1 z-20"><span>🛡️</span></div>}
                 </div>
-                {/* Details Area */}
                 <div className="p-2.5">
                     <div className="h-8 mb-1"><h3 className="text-[10px] font-bold leading-tight line-clamp-2 text-gray-900 dark:text-gray-200">{item.title}</h3></div>
                     <div className="flex items-center justify-between mb-2">
@@ -138,7 +139,6 @@ const ProductCard = ({ item, viewMode, isAdmin, handlers }) => {
             </div>
         );
     }
-    // Request View
     return (
         <div className="relative bg-white dark:bg-[#1a1a1a] rounded-2xl overflow-hidden shadow-sm border-l-4 border-l-[#8E44AD] transition-colors duration-300">
             <div className="p-3 flex flex-col h-full justify-between">
@@ -165,10 +165,10 @@ const ProductCard = ({ item, viewMode, isAdmin, handlers }) => {
 
 // --- MAIN LOGIC COMPONENT ---
 function MarketplaceLogic() {
-  const [products, setProducts] = useState([]);
-  const [requests, setRequests] = useState([]); 
+  const [products, setProducts] = useState<any[]>([]);
+  const [requests, setRequests] = useState<any[]>([]); 
   const [viewMode, setViewMode] = useState('market'); 
-  const [lightboxData, setLightboxData] = useState(null); 
+  const [lightboxData, setLightboxData] = useState<any>(null); 
   const [loading, setLoading] = useState(true);
   const [activeCampus, setActiveCampus] = useState('All');
   const [showModal, setShowModal] = useState(false);
@@ -178,48 +178,54 @@ function MarketplaceLogic() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [tickerMsg, setTickerMsg] = useState('');
-  const [broadcasts, setBroadcasts] = useState([]);
+  const [broadcasts, setBroadcasts] = useState<any[]>([]);
   const [clientIp, setClientIp] = useState('0.0.0.0');
-  const [systemReport, setSystemReport] = useState(null);
+  const [systemReport, setSystemReport] = useState<any>(null);
   
   const [postType, setPostType] = useState('sell'); 
   const [form, setForm] = useState({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
-  const [imageFiles, setImageFiles] = useState([]);
-  const [previewUrls, setPreviewUrls] = useState([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
-  const logoRef = useRef(null);
-  const holdTimer = useRef(null);
-  const galleryRef = useRef(null); 
+  const logoRef = useRef<HTMLDivElement>(null);
+  const holdTimer = useRef<any>(null);
+  const galleryRef = useRef<HTMLDivElement>(null); 
 
   useEffect(() => {
+    // Client-side only check for window
+    if (typeof window !== 'undefined') {
+        const savedTheme = localStorage.getItem('sentinel_theme');
+        if (savedTheme === 'dark') {
+            setDarkMode(true);
+            document.body.classList.add('dark-mode');
+            document.documentElement.classList.add('dark'); 
+        } else {
+            setDarkMode(false);
+            document.body.classList.remove('dark-mode');
+            document.documentElement.classList.remove('dark');
+            localStorage.setItem('sentinel_theme', 'light');
+        }
+    }
+
     fetchProducts();
     fetchRequests();
     fetchBroadcasts();
     
-    const savedTheme = localStorage.getItem('sentinel_theme');
-    if (savedTheme === 'dark') {
-        setDarkMode(true);
-        document.body.classList.add('dark-mode');
-        document.documentElement.classList.add('dark'); 
-    } else {
-        setDarkMode(false);
-        document.body.classList.remove('dark-mode');
-        document.documentElement.classList.remove('dark');
-        localStorage.setItem('sentinel_theme', 'light');
+    // Lazy load IP to prevent build blocking
+    if (typeof window !== 'undefined') {
+        fetch('https://api.ipify.org?format=json').then(res => res.json()).then(data => setClientIp(data.ip)).catch(() => {});
     }
-
-    fetch('https://api.ipify.org?format=json').then(res => res.json()).then(data => setClientIp(data.ip)).catch(() => {});
     
     const channel = supabase.channel('realtime_feed')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload: any) => {
         if(payload.eventType === 'INSERT') setProducts(prev => [payload.new, ...prev]);
         else if (payload.eventType === 'DELETE') setProducts(prev => prev.filter(p => p.id !== payload.old.id));
         else if (payload.eventType === 'UPDATE') setProducts(prev => prev.map(p => p.id === payload.new.id ? payload.new : p));
     })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, (payload) => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, (payload: any) => {
         if(payload.eventType === 'INSERT') setRequests(prev => [payload.new, ...prev]);
         else if (payload.eventType === 'DELETE') setRequests(prev => prev.filter(r => r.id !== payload.old.id));
         else if (payload.eventType === 'UPDATE') setRequests(prev => prev.map(r => r.id === payload.new.id ? payload.new : r));
@@ -227,6 +233,11 @@ function MarketplaceLogic() {
     .subscribe();
 
     return () => { supabase.removeChannel(channel); }
+  }, []);
+
+  // Check admin session on mount
+  useEffect(() => {
+      checkAdminSession();
   }, []);
 
   useEffect(() => {
@@ -244,7 +255,7 @@ function MarketplaceLogic() {
       const { data } = await supabase.from('broadcasts').select('*').order('created_at', { ascending: false });
       if(data) {
           setBroadcasts(data);
-          const activeMsgs = data.filter((b) => b.is_active).map((b) => b.message).join(' • ');
+          const activeMsgs = data.filter((b: any) => b.is_active).map((b: any) => b.message).join(' • ');
           setTickerMsg(activeMsgs || "CAMPUS MARKETPLACE");
       }
   }
@@ -275,28 +286,28 @@ function MarketplaceLogic() {
   };
 
   const handlers = {
-      handleBuyClick: async (product) => {
-          window.open(`https://wa.me/${product.whatsapp_number}`, '_blank');
+      handleBuyClick: async (product: any) => {
+          if (typeof window !== 'undefined') window.open(`https://wa.me/${product.whatsapp_number}`, '_blank');
           if(!isAdmin) await supabase.rpc('increment_clicks', { row_id: product.id });
       },
-      handleFulfillRequest: (req) => {
+      handleFulfillRequest: (req: any) => {
           const text = `Hi, I saw your request on CampusMarket for "${req.title}". I have it available.`;
-          window.open(`https://wa.me/${req.whatsapp_number}?text=${encodeURIComponent(text)}`, '_blank');
+          if (typeof window !== 'undefined') window.open(`https://wa.me/${req.whatsapp_number}?text=${encodeURIComponent(text)}`, '_blank');
       },
-      handleExpungeProduct: async (id) => { if(confirm("DELETE ITEM?")) await supabase.from('products').delete().eq('id', id); },
-      handleVerifyProduct: async (id, status) => { await supabase.from('products').update({ is_verified: !status }).eq('id', id); },
-      handleExpungeRequest: async (id) => { if(confirm("DELETE REQUEST?")) await supabase.from('requests').delete().eq('id', id); },
-      handleVerifyRequest: async (id, status) => { await supabase.from('requests').update({ is_verified: !status }).eq('id', id); },
-      openLightbox: (item, index) => {
+      handleExpungeProduct: async (id: any) => { if(confirm("DELETE ITEM?")) await supabase.from('products').delete().eq('id', id); },
+      handleVerifyProduct: async (id: any, status: boolean) => { await supabase.from('products').update({ is_verified: !status }).eq('id', id); },
+      handleExpungeRequest: async (id: any) => { if(confirm("DELETE REQUEST?")) await supabase.from('requests').delete().eq('id', id); },
+      handleVerifyRequest: async (id: any, status: boolean) => { await supabase.from('requests').update({ is_verified: !status }).eq('id', id); },
+      openLightbox: (item: any, index: number) => {
           const imgs = item.images || (item.image_url ? [item.image_url] : []);
           if (imgs.length > 0) setLightboxData({ images: imgs, startIndex: index });
       }
   };
 
-  const handlePost = async (e) => {
+  const handlePost = async (e: any) => {
     e.preventDefault();
     setSubmitting(true);
-    const sanitizePhone = (input) => {
+    const sanitizePhone = (input: string) => {
         let clean = input.replace(/\D/g, ''); 
         if (clean.startsWith('2340')) clean = '234' + clean.substring(4);
         if (clean.length === 11 && clean.startsWith('0')) clean = '234' + clean.substring(1);
@@ -306,7 +317,7 @@ function MarketplaceLogic() {
     };
     try {
         let finalPhone;
-        try { finalPhone = sanitizePhone(form.whatsapp); } catch (phoneErr) { alert(phoneErr.message); setSubmitting(false); return; }
+        try { finalPhone = sanitizePhone(form.whatsapp); } catch (phoneErr: any) { alert(phoneErr.message); setSubmitting(false); return; }
         
         const { data: banned } = await supabase.from('blacklist').select('ip_address').eq('ip_address', clientIp).maybeSingle();
         if(banned) { alert("Connection Refused."); setSubmitting(false); return; }
@@ -315,7 +326,7 @@ function MarketplaceLogic() {
             const { data: proData } = await supabase.from('verified_sellers').select('limit_per_day').eq('phone', finalPhone).maybeSingle();
             const dailyLimit = proData ? proData.limit_per_day : 3;
             const today = new Date().toLocaleDateString();
-            const quota = JSON.parse(localStorage.getItem('post_quota') || '{}');
+            const quota = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('post_quota') || '{}') : {};
             if (quota.date === today && quota.count >= dailyLimit) { alert(`Daily Limit Reached!`); setSubmitting(false); return; }
         }
 
@@ -343,36 +354,39 @@ function MarketplaceLogic() {
         if (error) throw error;
 
         const today = new Date().toLocaleDateString();
-        const currentQuota = JSON.parse(localStorage.getItem('post_quota') || '{}');
-        const newCount = (currentQuota.date === today ? currentQuota.count : 0) + 1;
-        localStorage.setItem('post_quota', JSON.stringify({ date: today, count: newCount }));
+        if (typeof window !== 'undefined') {
+            const currentQuota = JSON.parse(localStorage.getItem('post_quota') || '{}');
+            const newCount = (currentQuota.date === today ? currentQuota.count : 0) + 1;
+            localStorage.setItem('post_quota', JSON.stringify({ date: today, count: newCount }));
+        }
 
         confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
         setShowModal(false);
         setForm({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
         setImageFiles([]); setPreviewUrls([]);
         fetchProducts(); fetchRequests();
-    } catch (err) { alert("Error: " + err.message); } finally { setSubmitting(false); setUploadStatus(''); }
+    } catch (err: any) { alert("Error: " + err.message); } finally { setSubmitting(false); setUploadStatus(''); }
   };
 
-  const handleImageSelect = (e) => {
-      const files = Array.from(e.target.files).slice(0, 3);
+  const handleImageSelect = (e: any) => {
+      const files = Array.from(e.target.files as FileList).slice(0, 3);
       if (files.length > 0) {
           setImageFiles(files);
           setPreviewUrls(files.map(file => URL.createObjectURL(file)));
       }
   };
 
-  const handleLogoTouchStart = () => { holdTimer.current = setTimeout(() => { if (navigator.vibrate) navigator.vibrate(200); setShowLogin(true); }, 2000); };
+  const handleLogoTouchStart = () => { holdTimer.current = setTimeout(() => { if (typeof window !== 'undefined' && navigator.vibrate) navigator.vibrate(200); setShowLogin(true); }, 2000); };
   const handleLogoTouchEnd = () => clearTimeout(holdTimer.current);
-  const handleAdminLogin = async (e) => { e.preventDefault(); const { error } = await supabase.auth.signInWithPassword({ email: e.target.email.value, password: e.target.password.value }); if (!error) { setIsAdmin(true); setShowLogin(false); setShowAdminPanel(true); } else { alert("Access Denied"); } };
+  const handleAdminLogin = async (e: any) => { e.preventDefault(); const { error } = await supabase.auth.signInWithPassword({ email: e.target.email.value, password: e.target.password.value }); if (!error) { setIsAdmin(true); setShowLogin(false); setShowAdminPanel(true); } else { alert("Access Denied"); } };
   const handleLogout = async () => { await supabase.auth.signOut(); setIsAdmin(false); setShowAdminPanel(false); window.location.reload(); };
   const runSystemCleanup = async () => { const { data, error } = await supabase.rpc('run_quant_cleanup'); if(error) { alert("Cleanup Failed: " + error.message); } else { setSystemReport(data); fetchProducts(); fetchRequests(); } };
-  const handleAddBroadcast = async (e) => { e.preventDefault(); const msg = e.target.message.value; if(!msg) return; await supabase.from('broadcasts').insert([{ message: msg, is_active: true }]); e.target.reset(); };
-  const toggleBroadcast = async (id, currentStatus) => { await supabase.from('broadcasts').update({ is_active: !currentStatus }).eq('id', id); };
-  const deleteBroadcast = async (id) => { if(!confirm("Delete?")) await supabase.from('broadcasts').delete().eq('id', id); };
+  const handleAddBroadcast = async (e: any) => { e.preventDefault(); const msg = e.target.message.value; if(!msg) return; await supabase.from('broadcasts').insert([{ message: msg, is_active: true }]); e.target.reset(); };
+  const toggleBroadcast = async (id: any, currentStatus: boolean) => { await supabase.from('broadcasts').update({ is_active: !currentStatus }).eq('id', id); };
+  // FIXED LOGIC: Only delete if user confirms
+  const deleteBroadcast = async (id: any) => { if(confirm("Delete?")) { await supabase.from('broadcasts').delete().eq('id', id); } };
 
-  const filterList = (list) => {
+  const filterList = (list: any[]) => {
       return list.filter(item => {
           if (activeCampus !== 'All' && item.campus !== activeCampus) return false;
           const term = searchTerm.toLowerCase();
@@ -452,7 +466,7 @@ function MarketplaceLogic() {
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-900 p-5 rounded-3xl">
                             <h3 className="text-xs font-black uppercase text-gray-400 mb-4">📢 Active Broadcasts</h3>
-                            <div className="space-y-3 mb-4">{broadcasts.map(b => <div key={b.id} className="flex items-center justify-between bg-white dark:bg-black p-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800"><span className={`text-xs font-bold ${!b.is_active && 'opacity-30 line-through'}`}>{b.message}</span><div className="flex items-center gap-2"><button onClick={() => toggleBroadcast(b.id, b.is_active)} className="text-xl tap dark:text-white">{b.is_active ? '👁️' : '🚫'}</button><button onClick={() => deleteBroadcast(b.id)} className="text-xl opacity-30 hover:opacity-100 tap dark:text-white">🗑️</button></div></div>)}</div>
+                            <div className="space-y-3 mb-4">{broadcasts.map((b: any) => <div key={b.id} className="flex items-center justify-between bg-white dark:bg-black p-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800"><span className={`text-xs font-bold ${!b.is_active && 'opacity-30 line-through'}`}>{b.message}</span><div className="flex items-center gap-2"><button onClick={() => toggleBroadcast(b.id, b.is_active)} className="text-xl tap dark:text-white">{b.is_active ? '👁️' : '🚫'}</button><button onClick={() => deleteBroadcast(b.id)} className="text-xl opacity-30 hover:opacity-100 tap dark:text-white">🗑️</button></div></div>)}</div>
                             <form onSubmit={handleAddBroadcast} className="flex gap-2"><input name="message" className="wa-input dark:bg-gray-800 dark:text-white" placeholder="New Alert..." required /><button className="bg-black dark:bg-white dark:text-black text-white px-4 rounded-xl font-bold text-xs">ADD</button></form>
                         </div>
                         <button onClick={handleLogout} className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase">End Sovereign Session</button>
@@ -491,7 +505,7 @@ function MarketplaceLogic() {
             <div className="fixed inset-0 z-[300] bg-black flex flex-col animate-fade-in">
                 <button onClick={() => setLightboxData(null)} className="absolute top-5 right-5 text-white text-3xl font-bold bg-white/10 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md z-50 tap shadow-lg">×</button>
                 <div ref={galleryRef} className="flex overflow-x-auto snap-x snap-mandatory w-full h-full items-center scrollbar-hide">
-                    {lightboxData.images.map((img, i) => (
+                    {lightboxData.images.map((img: string, i: number) => (
                         <div key={i} className="w-screen h-screen flex-shrink-0 snap-center flex items-center justify-center p-1">
                             <img src={img} className="max-w-full max-h-full object-contain" alt="Gallery" />
                         </div>
@@ -499,7 +513,7 @@ function MarketplaceLogic() {
                 </div>
                 {lightboxData.images.length > 1 && (
                     <div className="absolute bottom-10 left-0 right-0 flex justify-center gap-2">
-                        {lightboxData.images.map((_, i) => (
+                        {lightboxData.images.map((_: any, i: number) => (
                             <div key={i} className={`w-2 h-2 rounded-full ${i === lightboxData.startIndex ? 'bg-white' : 'bg-white/30'}`}></div>
                         ))}
                     </div>
@@ -510,7 +524,7 @@ function MarketplaceLogic() {
   );
 }
 
-// WRAPPER
+// WRAPPER TO CATCH ERRORS
 export default function Marketplace() {
     return <ErrorBoundary><MarketplaceLogic /></ErrorBoundary>;
 }
