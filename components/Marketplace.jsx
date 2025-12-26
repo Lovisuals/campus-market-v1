@@ -67,6 +67,7 @@ export default function Marketplace() {
   const [products, setProducts] = useState([]);
   const [requests, setRequests] = useState([]); 
   const [viewMode, setViewMode] = useState('market'); 
+  const [fullscreenImg, setFullscreenImg] = useState(null); // NEW: Lightbox State
   
   const [loading, setLoading] = useState(true);
   const [activeCampus, setActiveCampus] = useState('All');
@@ -212,7 +213,6 @@ export default function Marketplace() {
           alert("Cleanup Failed: " + error.message);
       } else {
           setSystemReport(data);
-          // Refresh lists
           fetchProducts();
           fetchRequests();
       }
@@ -261,58 +261,33 @@ export default function Marketplace() {
       await supabase.from('broadcasts').delete().eq('id', id);
   };
 
-    // --- POSTING (V2: Aggressive Sanitizer) ---
+  // --- POSTING (V2: Aggressive Sanitizer) ---
   const handlePost = async (e) => {
     e.preventDefault();
     setSubmitting(true);
 
-    // 1. THE ULTIMATE PHONE FIXER
     const sanitizePhone = (input) => {
-        // Remove PLUS, SPACES, DASHES immediately.
-        // "+234 070-123" becomes "234070123"
         let clean = input.replace(/\D/g, ''); 
-
-        // CASE A: User typed "2340..." (Common mistake: Country code + 0)
-        if (clean.startsWith('2340')) {
-            clean = '234' + clean.substring(4);
-        }
-
-        // CASE B: User typed "080..." or "070..." (Standard Local)
-        if (clean.length === 11 && clean.startsWith('0')) {
-            clean = '234' + clean.substring(1);
-        }
-
-        // CASE C: User typed "80..." or "70..." (Missing leading zero)
-        if (clean.length === 10 && (clean.startsWith('8') || clean.startsWith('7') || clean.startsWith('9'))) {
-             clean = '234' + clean;
-        }
-
-        // Final Check: Must be 13 digits and start with 234
-        if (clean.length !== 13 || !clean.startsWith('234')) {
-            throw new Error(`Invalid Phone Number (${input}). Please check and try again.`);
-        }
-        
+        if (clean.startsWith('2340')) clean = '234' + clean.substring(4);
+        if (clean.length === 11 && clean.startsWith('0')) clean = '234' + clean.substring(1);
+        if (clean.length === 10 && (clean.startsWith('8') || clean.startsWith('7') || clean.startsWith('9'))) clean = '234' + clean;
+        if (clean.length !== 13 || !clean.startsWith('234')) throw new Error(`Invalid Phone Number. Use format: 08012345678`);
         return clean;
     };
     
     try {
-        // 2. RUN THE FIXER
         let finalPhone;
         try {
             finalPhone = sanitizePhone(form.whatsapp);
-            // DEBUG: Show the user what the system sees (Optional, good for trust)
-            // console.log("System formatted phone to:", finalPhone);
         } catch (phoneErr) {
             alert(phoneErr.message); 
             setSubmitting(false); 
             return; 
         }
 
-        // 3. BLACKLIST CHECK
         const { data: banned } = await supabase.from('blacklist').select('ip_address').eq('ip_address', clientIp).maybeSingle();
         if(banned) { alert("Connection Refused."); setSubmitting(false); return; }
 
-        // 4. DAILY LIMIT CHECK (Using FIXED number)
         if (!isAdmin) {
             const { data: proData } = await supabase.from('verified_sellers').select('limit_per_day').eq('phone', finalPhone).maybeSingle();
             const dailyLimit = proData ? proData.limit_per_day : 3;
@@ -323,7 +298,6 @@ export default function Marketplace() {
             }
         }
 
-        // 5. IMAGE UPLOAD
         let finalImageUrls = [];
         if (imageFiles.length > 0) {
             setUploadStatus('Uploading...');
@@ -338,13 +312,12 @@ export default function Marketplace() {
             }
         }
 
-        // 6. DB INSERT (Using finalPhone)
         setUploadStatus('Publishing...');
         if (postType === 'sell') {
             const { error } = await supabase.from('products').insert([{
                 title: form.title,
                 price: form.price,
-                whatsapp_number: finalPhone, // <--- GUARANTEED 234 FORMAT
+                whatsapp_number: finalPhone, 
                 campus: form.campus,
                 item_type: form.type,
                 images: finalImageUrls.length > 0 ? finalImageUrls : ["https://placehold.co/600x600/008069/white?text=No+Photo"],
@@ -358,7 +331,7 @@ export default function Marketplace() {
             const { error } = await supabase.from('requests').insert([{
                 title: form.title,
                 budget: form.price, 
-                whatsapp_number: finalPhone, // <--- GUARANTEED 234 FORMAT
+                whatsapp_number: finalPhone, 
                 campus: form.campus,
                 image_url: finalImageUrls[0] || null, 
                 ip_address: clientIp,
@@ -367,7 +340,6 @@ export default function Marketplace() {
             if (error) throw error;
         }
 
-        // 7. CLEANUP
         const today = new Date().toLocaleDateString();
         const currentQuota = JSON.parse(localStorage.getItem('post_quota') || '{}');
         const newCount = (currentQuota.date === today ? currentQuota.count : 0) + 1;
@@ -388,7 +360,6 @@ export default function Marketplace() {
         setUploadStatus('');
     }
   };
-
 
   const handleImageSelect = (e) => {
       const files = Array.from(e.target.files).slice(0, 3);
@@ -510,10 +481,16 @@ export default function Marketplace() {
 
                     return (
                         <div key={item.id} className={`product-card ${item.is_admin_post ? 'border-2 border-yellow-500' : ''}`}>
-                             <div className="h-40 bg-gray-200 relative group overflow-hidden">
+                             {/* UPDATED: ASPECT-SQUARE & FULLSCREEN CLICK */}
+                             <div className="aspect-square bg-gray-200 relative group overflow-hidden cursor-pointer">
                                 <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-full h-full">
                                     {item.images && item.images.length > 0 ? item.images.map((img, idx) => (
-                                        <img key={idx} src={img} className="w-full h-full object-cover flex-shrink-0 snap-center" />
+                                        <img 
+                                            key={idx} 
+                                            src={img} 
+                                            onClick={() => setFullscreenImg(img)} 
+                                            className="w-full h-full object-cover flex-shrink-0 snap-center" 
+                                        />
                                     )) : <img src="https://placehold.co/600x600/008069/white?text=No+Photo" className="w-full h-full object-cover" />}
                                 </div>
                                 {item.images?.length > 1 && <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">{item.images.map((_, i) => <div key={i} className="w-1.5 h-1.5 rounded-full bg-white/80 shadow-sm border border-black/10"></div>)}</div>}
@@ -563,10 +540,10 @@ export default function Marketplace() {
                                         {item.title}
                                         {item.is_verified && <span className="text-yellow-500 text-sm">✓</span>}
                                     </h3>
-                                    {item.image_url && <img src={item.image_url} className="w-12 h-12 rounded-lg object-cover mb-2 border border-gray-100" />}
+                                    {/* CLICKABLE REQUEST IMAGE */}
+                                    {item.image_url && <img src={item.image_url} onClick={() => setFullscreenImg(item.image_url)} className="w-12 h-12 rounded-lg object-cover mb-2 border border-gray-100 cursor-pointer" />}
                                     <p className="font-black text-sm text-gray-700">Budget: ₦{Number(item.budget).toLocaleString()}</p>
                                     
-                                    {/* Verification Badge for Requests */}
                                     {item.is_verified && <div className="absolute top-0 right-0 -mt-1"><span className="text-xl">🛡️</span></div>}
                                 </div>
                                 <button onClick={() => handleFulfillRequest(item)} className="mt-4 block w-full bg-[#8E44AD] text-white text-center py-2.5 rounded-xl text-[10px] font-black uppercase transition tap shadow-md">I Have This</button>
@@ -630,6 +607,7 @@ export default function Marketplace() {
             </div>
         )}
 
+        {/* ... ADMIN PANEL ... */}
         {showAdminPanel && (
             <div className="fixed inset-0 z-[200] bg-white dark:bg-black overflow-y-auto">
                 <div className="p-6">
@@ -638,8 +616,6 @@ export default function Marketplace() {
                         <button onClick={() => setShowAdminPanel(false)} className="text-xs font-bold opacity-50 bg-gray-100 px-3 py-1 rounded-lg">CLOSE</button>
                     </div>
                     <div className="space-y-8">
-                        
-                        {/* 1. QUANT SYSTEM STATUS */}
                         <div className="bg-blue-50 dark:bg-blue-900/20 p-5 rounded-3xl border border-blue-100 dark:border-blue-900">
                              <h3 className="text-xs font-black uppercase text-blue-500 mb-2">SYSTEM QUANT STATUS</h3>
                              {systemReport ? (
@@ -652,8 +628,6 @@ export default function Marketplace() {
                                  <button onClick={runSystemCleanup} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase w-full">RUN SYSTEM CLEANUP</button>
                              )}
                         </div>
-
-                        {/* 2. BROADCASTS */}
                         <div className="bg-gray-50 dark:bg-gray-900 p-5 rounded-3xl">
                             <h3 className="text-xs font-black uppercase text-gray-400 mb-4">📢 Active Broadcasts</h3>
                             <div className="space-y-3 mb-4">
@@ -678,7 +652,7 @@ export default function Marketplace() {
             </div>
         )}
         
-        {/* ... Pro Modal, Login Modal (Same) ... */}
+        {/* ... PRO MODAL & LOGIN MODAL ... */}
         {showProModal && (
             <div className="fixed inset-0 z-[140] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-fade-in">
                 <div className="glass-3d w-full max-w-sm p-8 text-center relative">
@@ -702,6 +676,14 @@ export default function Marketplace() {
                         <button type="button" onClick={() => setShowLogin(false)} className="w-full text-[10px] font-bold text-gray-500 py-2 uppercase tap">Abort</button>
                     </form>
                 </div>
+            </div>
+        )}
+
+        {/* --- NEW: LIGHTBOX MODAL --- */}
+        {fullscreenImg && (
+            <div className="fixed inset-0 z-[300] bg-black flex items-center justify-center animate-fade-in">
+                <button onClick={() => setFullscreenImg(null)} className="absolute top-5 right-5 text-white text-3xl font-bold bg-white/10 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md z-50 tap">×</button>
+                <img src={fullscreenImg} className="max-w-screen max-h-screen object-contain" />
             </div>
         )}
     </div>
