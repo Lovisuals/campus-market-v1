@@ -69,8 +69,8 @@ export default function Marketplace() {
   const [requests, setRequests] = useState([]); 
   const [viewMode, setViewMode] = useState('market'); 
   
-  // NEW: Lightbox now holds the LIST of images, not just one
-  const [lightboxData, setLightboxData] = useState(null); // { images: [], startIndex: 0 }
+  // LIGHTBOX STATE
+  const [lightboxData, setLightboxData] = useState(null); 
   
   const [loading, setLoading] = useState(true);
   const [activeCampus, setActiveCampus] = useState('All');
@@ -108,7 +108,7 @@ export default function Marketplace() {
     if (savedTheme === 'dark') {
         setDarkMode(true);
         document.body.classList.add('dark-mode');
-        document.documentElement.classList.add('dark'); // Add standard Tailwind class
+        document.documentElement.classList.add('dark'); 
     }
 
     fetch('https://api.ipify.org?format=json').then(res => res.json()).then(data => setClientIp(data.ip)).catch(() => {});
@@ -139,6 +139,13 @@ export default function Marketplace() {
 
     return () => { supabase.removeChannel(channel); }
   }, []);
+
+  // --- LIGHTBOX SCROLL EFFECT ---
+  useEffect(() => {
+      if (lightboxData && galleryRef.current && lightboxData.startIndex > 0) {
+          galleryRef.current.scrollLeft = window.innerWidth * lightboxData.startIndex;
+      }
+  }, [lightboxData]);
 
   const checkAdminSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -210,8 +217,6 @@ export default function Marketplace() {
       const imgs = item.images || (item.image_url ? [item.image_url] : []);
       if (imgs.length > 0) {
           setLightboxData({ images: imgs, startIndex: index });
-          // Note: Scrolling to startIndex happens in the Render via Ref, 
-          // or we can just let user swipe. Simple is best.
       }
   };
 
@@ -387,7 +392,7 @@ export default function Marketplace() {
       handleVerifyProduct,
       handleExpungeRequest,
       handleVerifyRequest,
-      openLightbox // <--- Passing the new handler
+      openLightbox 
   };
 
   // --- RENDER ---
@@ -487,7 +492,7 @@ export default function Marketplace() {
 
         <button onClick={() => setShowModal(true)} className="fixed bottom-8 right-6 fab z-50 tap">+</button>
 
-        {/* --- MODALS (Unchanged logic, just ensure dark mode support) --- */}
+        {/* MODALS */}
         {showModal && (
             <div className="fixed inset-0 bg-black/60 z-[100] flex items-end backdrop-blur-sm">
                 <div className="glass-3d w-full p-6 rounded-t-[32px] animate-slide-up max-h-[85vh] overflow-y-auto dark:bg-gray-900">
@@ -612,15 +617,8 @@ export default function Marketplace() {
                 
                 {/* Scrollable Container */}
                 <div 
+                    ref={galleryRef}
                     className="flex overflow-x-auto snap-x snap-mandatory w-full h-full items-center scrollbar-hide"
-                    ref={(el) => {
-                        // Auto-scroll to the clicked image on mount
-                        if (el && lightboxData && lightboxData.startIndex > 0) {
-                            el.scrollLeft = window.innerWidth * lightboxData.startIndex;
-                            // Reset start index so it doesn't fight the user scrolling back
-                            lightboxData.startIndex = 0; 
-                        }
-                    }}
                 >
                     {lightboxData.images.map((img, i) => (
                         <div key={i} className="w-screen h-screen flex-shrink-0 snap-center flex items-center justify-center p-1">
@@ -633,7 +631,7 @@ export default function Marketplace() {
                 {lightboxData.images.length > 1 && (
                     <div className="absolute bottom-10 left-0 right-0 flex justify-center gap-2">
                         {lightboxData.images.map((_, i) => (
-                            <div key={i} className="w-1.5 h-1.5 rounded-full bg-white/50"></div>
+                            <div key={i} className={`w-2 h-2 rounded-full ${i === lightboxData.startIndex ? 'bg-white' : 'bg-white/30'}`}></div>
                         ))}
                     </div>
                 )}
