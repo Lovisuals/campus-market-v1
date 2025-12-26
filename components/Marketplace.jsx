@@ -1,11 +1,50 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import confetti from 'canvas-confetti';
-import ProductCard from './ProductCard'; 
 
-// --- CONFIGURATION ---
+// ==========================================
+// 1. THE CRASH REPORTER (DEBUGGER)
+// ==========================================
+// This watches your app. If it crashes, it tells you WHY.
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    this.setState({ error, errorInfo });
+    console.error("🚨 CRITICAL SYSTEM FAILURE:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-10 bg-red-50 text-red-900 min-h-screen font-mono">
+          <h1 className="text-2xl font-black mb-4">⚠️ SYSTEM ALERT: RENDER FAILURE</h1>
+          <div className="bg-white p-6 rounded-xl border border-red-200 shadow-lg overflow-auto">
+            <p className="font-bold text-red-600 mb-2">{this.state.error && this.state.error.toString()}</p>
+            <pre className="text-xs opacity-70 whitespace-pre-wrap">
+              {this.state.errorInfo && this.state.errorInfo.componentStack}
+            </pre>
+          </div>
+          <button onClick={() => window.location.reload()} className="mt-6 bg-red-600 text-white px-6 py-3 rounded-xl font-bold">REBOOT SYSTEM</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ==========================================
+// 2. CONFIGURATION & HELPERS
+// ==========================================
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -63,8 +102,103 @@ const compressImage = async (file) => {
     });
 };
 
-export default function Marketplace() {
-  // STATE
+// ==========================================
+// 3. THE VISUAL COMPONENT (Internal)
+// ==========================================
+// We define this INSIDE the file to prevent import errors.
+const ProductCard = ({ item, viewMode, isAdmin, userLoc, campuses, handlers }) => {
+    const isSold = (item.click_count || 0) >= 5;
+    const campData = campuses.find(c => c.id === item.campus);
+    const dist = userLoc && campData ? getDistance(userLoc.lat, userLoc.lng, campData.lat, campData.lng).toFixed(1) + 'km' : item.campus;
+    
+    const scrollRef = useRef(null);
+    
+    useEffect(() => {
+        if (!item.images || item.images.length <= 1) return;
+        const interval = setInterval(() => {
+            if (scrollRef.current) {
+                const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+                if (scrollLeft + clientWidth >= scrollWidth - 10) {
+                    scrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+                } else {
+                    scrollRef.current.scrollBy({ left: clientWidth, behavior: 'smooth' });
+                }
+            }
+        }, 3000);
+        return () => clearInterval(interval);
+    }, [item.images]);
+
+    if (viewMode === 'market') {
+        return (
+            <div className={`relative bg-white dark:bg-[#1a1a1a] rounded-2xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-800 transition-colors duration-300 ${item.is_admin_post ? 'ring-2 ring-yellow-400' : ''}`}>
+                <div className="aspect-square bg-white dark:bg-gray-800 relative overflow-hidden group">
+                    <div ref={scrollRef} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-full h-full">
+                         {item.images && item.images.length > 0 ? item.images.map((img, idx) => (
+                            <img key={idx} src={img} onClick={() => handlers.openLightbox(item, idx)} className="w-full h-full object-cover flex-shrink-0 snap-center cursor-pointer" alt={item.title} />
+                        )) : <img src="https://placehold.co/400x400/008069/white?text=No+Photo" className="w-full h-full object-cover" alt="Placeholder" />}
+                    </div>
+                    {item.images?.length > 1 && (
+                        <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1 z-10">
+                            {item.images.map((_, i) => <div key={i} className="w-1 h-1 rounded-full bg-white/80 shadow-sm backdrop-blur-sm"></div>)}
+                        </div>
+                    )}
+                    {isSold && <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20"><span className="text-white font-black border-2 px-1 py-0.5 text-[8px] -rotate-12">SOLD</span></div>}
+                    {item.is_verified && <div className="absolute top-1 right-1 bg-yellow-400 text-black text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-md flex items-center gap-1 z-20"><span>🛡️</span></div>}
+                </div>
+                <div className="p-2.5">
+                    <div className="h-8 mb-1">
+                        <h3 className="text-[10px] font-bold leading-tight line-clamp-2 text-gray-900 dark:text-gray-200">{item.title}</h3>
+                    </div>
+                    <div className="flex items-center justify-between mb-2">
+                         <p className="font-black text-xs text-[var(--wa-teal)]">₦{Number(item.price).toLocaleString()}</p>
+                         <span className="text-[8px] font-bold text-gray-400">{dist}</span>
+                    </div>
+                    <button onClick={() => handlers.handleBuyClick(item)} disabled={isSold} className={`w-full py-2 rounded-lg text-[9px] font-black uppercase tracking-wide transition tap ${isSold ? 'bg-gray-100 text-gray-400' : 'bg-[var(--wa-teal)]/10 text-[var(--wa-teal)] hover:bg-[var(--wa-teal)] hover:text-white'}`}>
+                        {isSold ? 'Sold' : 'Chat'}
+                    </button>
+                    {isAdmin && (
+                        <div className="grid grid-cols-2 gap-1 mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                            <button onClick={() => handlers.handleExpungeProduct(item.id)} className="bg-red-50 text-red-500 py-1 rounded text-[8px] font-bold">DEL</button>
+                            <button onClick={() => handlers.handleVerifyProduct(item.id, item.is_verified)} className={`py-1 rounded text-[8px] font-bold ${item.is_verified ? 'bg-gray-100' : 'bg-yellow-50 text-yellow-600'}`}>{item.is_verified ? 'UN-V' : 'VER'}</button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+    return (
+        <div className="relative bg-white dark:bg-[#1a1a1a] rounded-2xl overflow-hidden shadow-sm border-l-4 border-l-[#8E44AD] transition-colors duration-300">
+            <div className="p-3 flex flex-col h-full justify-between">
+                <div>
+                    <div className="flex justify-between items-start mb-2">
+                        <span className="bg-[#8E44AD]/10 text-[#8E44AD] text-[7px] font-black px-1.5 py-0.5 rounded uppercase">WANTED</span>
+                        <span className="text-[8px] font-bold text-gray-400">{dist}</span>
+                    </div>
+                    <h3 className="text-[10px] font-bold leading-tight mb-2 line-clamp-2 text-gray-900 dark:text-gray-200">{item.title}</h3>
+                    {item.image_url && (
+                        <img src={item.image_url} onClick={() => handlers.openLightbox(item, 0)} className="w-8 h-8 rounded-md object-cover mb-2 border border-gray-100 dark:border-gray-700 cursor-pointer" alt="Request" />
+                    )}
+                    <p className="font-black text-xs text-gray-700 dark:text-gray-300">₦{Number(item.budget).toLocaleString()}</p>
+                    {item.is_verified && <div className="absolute top-1 right-1"><span className="text-sm">🛡️</span></div>}
+                </div>
+                <div className="mt-3">
+                    <button onClick={() => handlers.handleFulfillRequest(item)} className="w-full bg-[#8E44AD] text-white py-2 rounded-lg text-[9px] font-black uppercase shadow-sm tap">I Have This</button>
+                    {isAdmin && (
+                        <div className="grid grid-cols-2 gap-1 mt-2">
+                            <button onClick={() => handlers.handleExpungeRequest(item.id)} className="text-red-500 text-[8px] font-bold">DEL</button>
+                            <button onClick={() => handlers.handleVerifyRequest(item.id, item.is_verified)} className="text-yellow-600 text-[8px] font-bold">VER</button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// 4. MAIN LOGIC (The Brain)
+// ==========================================
+function MarketplaceLogic() {
   const [products, setProducts] = useState([]);
   const [requests, setRequests] = useState([]); 
   const [viewMode, setViewMode] = useState('market'); 
@@ -90,18 +224,18 @@ export default function Marketplace() {
   const [previewUrls, setPreviewUrls] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const logoRef = useRef(null);
   const holdTimer = useRef(null);
   const galleryRef = useRef(null); 
 
-  // --- INIT ---
   useEffect(() => {
     fetchProducts();
     fetchRequests();
     fetchBroadcasts();
 
-    // FORCE LIGHT MODE DEFAULT unless 'dark' is explicitly saved
+    // STRICT DARK MODE CHECK
     const savedTheme = localStorage.getItem('sentinel_theme');
     if (savedTheme === 'dark') {
         setDarkMode(true);
@@ -143,7 +277,6 @@ export default function Marketplace() {
     return () => { supabase.removeChannel(channel); }
   }, []);
 
-  // --- LIGHTBOX SCROLL EFFECT ---
   useEffect(() => {
       if (lightboxData && galleryRef.current && lightboxData.startIndex > 0) {
           galleryRef.current.scrollLeft = window.innerWidth * lightboxData.startIndex;
@@ -189,7 +322,6 @@ export default function Marketplace() {
       }
   };
 
-  // --- HANDLERS ---
   const handleBuyClick = async (product) => {
       window.open(`https://wa.me/${product.whatsapp_number}`, '_blank');
       if(!isAdmin) await supabase.rpc('increment_clicks', { row_id: product.id });
@@ -222,7 +354,6 @@ export default function Marketplace() {
       }
   };
 
-  // --- ACTIONS ---
   const handleLogoTouchStart = () => {
       holdTimer.current = setTimeout(() => {
           if (navigator.vibrate) navigator.vibrate(200);
@@ -279,11 +410,9 @@ export default function Marketplace() {
       await supabase.from('broadcasts').delete().eq('id', id);
   };
 
-  // --- POSTING (V2) ---
   const handlePost = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-
     const sanitizePhone = (input) => {
         let clean = input.replace(/\D/g, ''); 
         if (clean.startsWith('2340')) clean = '234' + clean.substring(4);
@@ -292,7 +421,6 @@ export default function Marketplace() {
         if (clean.length !== 13 || !clean.startsWith('234')) throw new Error(`Invalid Phone Number. Use format: 08012345678`);
         return clean;
     };
-    
     try {
         let finalPhone;
         try {
@@ -302,10 +430,8 @@ export default function Marketplace() {
             setSubmitting(false); 
             return; 
         }
-
         const { data: banned } = await supabase.from('blacklist').select('ip_address').eq('ip_address', clientIp).maybeSingle();
         if(banned) { alert("Connection Refused."); setSubmitting(false); return; }
-
         if (!isAdmin) {
             const { data: proData } = await supabase.from('verified_sellers').select('limit_per_day').eq('phone', finalPhone).maybeSingle();
             const dailyLimit = proData ? proData.limit_per_day : 3;
@@ -315,7 +441,6 @@ export default function Marketplace() {
                 alert(`Daily Limit Reached!`); setSubmitting(false); return;
             }
         }
-
         let finalImageUrls = [];
         if (imageFiles.length > 0) {
             setUploadStatus('Uploading...');
@@ -329,7 +454,6 @@ export default function Marketplace() {
                 }
             }
         }
-
         setUploadStatus('Publishing...');
         if (postType === 'sell') {
             const { error } = await supabase.from('products').insert([{
@@ -357,12 +481,10 @@ export default function Marketplace() {
             }]);
             if (error) throw error;
         }
-
         const today = new Date().toLocaleDateString();
         const currentQuota = JSON.parse(localStorage.getItem('post_quota') || '{}');
         const newCount = (currentQuota.date === today ? currentQuota.count : 0) + 1;
         localStorage.setItem('post_quota', JSON.stringify({ date: today, count: newCount }));
-
         confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
         setShowModal(false);
         setForm({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
@@ -370,7 +492,6 @@ export default function Marketplace() {
         setPreviewUrls([]);
         fetchProducts();
         fetchRequests();
-
     } catch (err) {
         alert("Error: " + err.message);
     } finally {
@@ -397,9 +518,6 @@ export default function Marketplace() {
       openLightbox 
   };
 
-  // --- RENDER ---
-  const [searchTerm, setSearchTerm] = useState('');
-
   const filterList = (list) => {
       return list.filter(item => {
           if (activeCampus !== 'All' && item.campus !== activeCampus) return false;
@@ -410,7 +528,6 @@ export default function Marketplace() {
   };
 
   let displayItems = viewMode === 'market' ? filterList(products) : filterList(requests);
-
   if (userLoc && activeCampus === 'All') {
       displayItems.sort((a, b) => {
           const cA = CAMPUSES.find(c => c.id === a.campus) || {};
@@ -421,24 +538,15 @@ export default function Marketplace() {
 
   return (
     <div className="min-h-screen pb-32 transition-colors duration-300 dark:bg-black">
-        {/* TICKER */}
         <div className="ticker-container">
             <div className="ticker-content">
                 <span id="adText" className="text-[var(--wa-neon)] font-black text-[10px] uppercase tracking-widest">{tickerMsg}</span>
             </div>
         </div>
 
-        {/* HEADER */}
         <header className="sticky top-0 z-50 bg-[var(--wa-chat-bg)] dark:bg-black/90 border-b border-[var(--border)] pt-safe noselect shadow-sm backdrop-blur-md">
             <div className="px-5 py-4 flex justify-between items-center">
-                <div 
-                    ref={logoRef} 
-                    onMouseDown={handleLogoTouchStart} 
-                    onMouseUp={handleLogoTouchEnd} 
-                    onTouchStart={handleLogoTouchStart} 
-                    onTouchEnd={handleLogoTouchEnd} 
-                    className="cursor-pointer"
-                >
+                <div ref={logoRef} onMouseDown={handleLogoTouchStart} onMouseUp={handleLogoTouchEnd} onTouchStart={handleLogoTouchStart} onTouchEnd={handleLogoTouchEnd} className="cursor-pointer">
                     <h1 className="text-[17px] font-extrabold tracking-tighter text-[var(--wa-teal)]">CAMPUS <span className="opacity-30">MARKETPLACE</span></h1>
                     {isAdmin && <span className="text-[8px] text-yellow-500 font-black uppercase bg-yellow-100 px-1 rounded ml-1">Sovereign Active</span>}
                 </div>
@@ -453,12 +561,10 @@ export default function Marketplace() {
                     )}
                 </div>
             </div>
-
             <div className="px-5 pb-2 flex gap-2">
                 <button onClick={() => setViewMode('market')} className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'market' ? 'bg-[var(--wa-teal)] text-white shadow-lg' : 'bg-[var(--surface)] dark:bg-gray-800 text-gray-400'}`}>Items For Sale</button>
                 <button onClick={() => setViewMode('requests')} className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'requests' ? 'bg-[#8E44AD] text-white shadow-lg' : 'bg-[var(--surface)] dark:bg-gray-800 text-gray-400'}`}>Request Board</button>
             </div>
-
              <div className="px-5 pb-3 flex gap-3 overflow-x-auto scrollbar-hide pt-2">
                 {CAMPUSES.map(c => (
                     <button key={c.id} onClick={() => setActiveCampus(c.id)} className={`flex-none px-5 py-2 rounded-full text-[10px] font-black border transition tap ${activeCampus === c.id ? 'bg-[var(--wa-teal)] text-white border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-400'}`}>
@@ -466,7 +572,6 @@ export default function Marketplace() {
                     </button>
                 ))}
             </div>
-            
             <div className="px-5 py-3">
                 <div className="search-container dark:bg-gray-800">
                     <span className="opacity-20 text-sm mr-3">🔍</span>
@@ -475,26 +580,16 @@ export default function Marketplace() {
             </div>
         </header>
 
-        {/* FEED */}
         <main id="feed" className="grid grid-cols-2 gap-3 px-4 pb-20">
             {loading ? <p className="col-span-2 text-center py-10 opacity-40">Loading...</p> : 
              displayItems.length === 0 ? <p className="col-span-2 text-center py-10 opacity-40 text-sm font-bold">No items found here yet.</p> :
              displayItems.map(item => (
-                 <ProductCard 
-                    key={item.id} 
-                    item={item} 
-                    viewMode={viewMode}
-                    isAdmin={isAdmin}
-                    userLoc={userLoc}
-                    campuses={CAMPUSES}
-                    handlers={itemHandlers}
-                 />
+                 <ProductCard key={item.id} item={item} viewMode={viewMode} isAdmin={isAdmin} userLoc={userLoc} campuses={CAMPUSES} handlers={itemHandlers} />
             ))}
         </main>
 
         <button onClick={() => setShowModal(true)} className="fixed bottom-8 right-6 fab z-50 tap">+</button>
 
-        {/* MODALS */}
         {showModal && (
             <div className="fixed inset-0 bg-black/60 z-[100] flex items-end backdrop-blur-sm">
                 <div className="glass-3d w-full p-6 rounded-t-[32px] animate-slide-up max-h-[85vh] overflow-y-auto dark:bg-gray-900">
@@ -606,30 +701,16 @@ export default function Marketplace() {
             </div>
         )}
 
-        {/* --- TIKTOK STYLE LIGHTBOX GALLERY --- */}
         {lightboxData && (
             <div className="fixed inset-0 z-[300] bg-black flex flex-col animate-fade-in">
-                {/* Close Button */}
-                <button 
-                    onClick={() => setLightboxData(null)} 
-                    className="absolute top-5 right-5 text-white text-3xl font-bold bg-white/10 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md z-50 tap shadow-lg"
-                >
-                    ×
-                </button>
-                
-                {/* Scrollable Container */}
-                <div 
-                    ref={galleryRef}
-                    className="flex overflow-x-auto snap-x snap-mandatory w-full h-full items-center scrollbar-hide"
-                >
+                <button onClick={() => setLightboxData(null)} className="absolute top-5 right-5 text-white text-3xl font-bold bg-white/10 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md z-50 tap shadow-lg">×</button>
+                <div ref={galleryRef} className="flex overflow-x-auto snap-x snap-mandatory w-full h-full items-center scrollbar-hide">
                     {lightboxData.images.map((img, i) => (
                         <div key={i} className="w-screen h-screen flex-shrink-0 snap-center flex items-center justify-center p-1">
-                            <img src={img} className="max-w-full max-h-full object-contain" />
+                            <img src={img} className="max-w-full max-h-full object-contain" alt="Gallery" />
                         </div>
                     ))}
                 </div>
-
-                {/* Dots Indicator (If multiple) */}
                 {lightboxData.images.length > 1 && (
                     <div className="absolute bottom-10 left-0 right-0 flex justify-center gap-2">
                         {lightboxData.images.map((_, i) => (
@@ -641,4 +722,13 @@ export default function Marketplace() {
         )}
     </div>
   );
+}
+
+// WRAPPER TO CATCH ERRORS
+export default function Marketplace() {
+    return (
+        <ErrorBoundary>
+            <MarketplaceLogic />
+        </ErrorBoundary>
+    );
 }
