@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import confetti from 'canvas-confetti';
+import ProductCard from './ProductCard'; // <--- IMPORTING THE VISUALS
 
 // --- CONFIGURATION ---
 const supabase = createClient(
@@ -67,7 +68,7 @@ export default function Marketplace() {
   const [products, setProducts] = useState([]);
   const [requests, setRequests] = useState([]); 
   const [viewMode, setViewMode] = useState('market'); 
-  const [fullscreenImg, setFullscreenImg] = useState(null); // NEW: Lightbox State
+  const [fullscreenImg, setFullscreenImg] = useState(null);
   
   const [loading, setLoading] = useState(true);
   const [activeCampus, setActiveCampus] = useState('All');
@@ -78,12 +79,9 @@ export default function Marketplace() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [userLoc, setUserLoc] = useState(null);
-  
   const [tickerMsg, setTickerMsg] = useState('');
   const [broadcasts, setBroadcasts] = useState([]);
   const [clientIp, setClientIp] = useState('0.0.0.0');
-  
-  // SYSTEM HEALTH
   const [systemReport, setSystemReport] = useState(null);
 
   // FORM STATE
@@ -97,6 +95,7 @@ export default function Marketplace() {
   const logoRef = useRef(null);
   const holdTimer = useRef(null);
 
+  // --- INIT ---
   useEffect(() => {
     fetchProducts();
     fetchRequests();
@@ -118,7 +117,6 @@ export default function Marketplace() {
 
     checkAdminSession();
 
-    // REALTIME
     const channel = supabase.channel('realtime_feed')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
         if(payload.eventType === 'INSERT') setProducts(prev => [payload.new, ...prev]);
@@ -175,6 +173,32 @@ export default function Marketplace() {
       }
   };
 
+  // --- HANDLERS (Passed to Card) ---
+  const handleBuyClick = async (product) => {
+      window.open(`https://wa.me/${product.whatsapp_number}`, '_blank');
+      if(!isAdmin) await supabase.rpc('increment_clicks', { row_id: product.id });
+  };
+  const handleFulfillRequest = (req) => {
+      const text = `Hi, I saw your request on CampusMarket for "${req.title}". I have it available.`;
+      window.open(`https://wa.me/${req.whatsapp_number}?text=${encodeURIComponent(text)}`, '_blank');
+  };
+  const handleExpungeProduct = async (id) => {
+      if(!confirm("DELETE ITEM?")) return;
+      await supabase.from('products').delete().eq('id', id);
+  };
+  const handleVerifyProduct = async (id, currentStatus) => {
+      const { error } = await supabase.from('products').update({ is_verified: !currentStatus }).eq('id', id);
+      if(error) alert("Update Failed: " + error.message);
+  };
+  const handleExpungeRequest = async (id) => {
+      if(!confirm("DELETE REQUEST?")) return;
+      await supabase.from('requests').delete().eq('id', id);
+  };
+  const handleVerifyRequest = async (id, currentStatus) => {
+      const { error } = await supabase.from('requests').update({ is_verified: !currentStatus }).eq('id', id);
+      if(error) alert("Update Failed: " + error.message);
+  }
+
   // --- ACTIONS ---
   const handleLogoTouchStart = () => {
       holdTimer.current = setTimeout(() => {
@@ -206,7 +230,6 @@ export default function Marketplace() {
       window.location.reload();
   };
 
-  // --- QUANT CLEANUP ---
   const runSystemCleanup = async () => {
       const { data, error } = await supabase.rpc('run_quant_cleanup');
       if(error) {
@@ -217,33 +240,6 @@ export default function Marketplace() {
           fetchRequests();
       }
   }
-
-  // --- ADMIN TOOLS ---
-  const handleExpungeProduct = async (id) => {
-      if(!confirm("DELETE ITEM?")) return;
-      await supabase.from('products').delete().eq('id', id);
-  };
-  
-  const handleVerifyProduct = async (id, currentStatus) => {
-      const { error } = await supabase.from('products').update({ is_verified: !currentStatus }).eq('id', id);
-      if(error) alert("Update Failed: " + error.message);
-  };
-
-  const handleVerifyRequest = async (id, currentStatus) => {
-      const { error } = await supabase.from('requests').update({ is_verified: !currentStatus }).eq('id', id);
-      if(error) alert("Update Failed: " + error.message);
-  }
-
-  const handleExpungeRequest = async (id) => {
-      if(!confirm("DELETE REQUEST?")) return;
-      await supabase.from('requests').delete().eq('id', id);
-  };
-  
-  const handleBanIP = async (ip) => {
-      if(!confirm(`BAN IP ${ip} PERMANENTLY?`)) return;
-      await supabase.from('blacklist').insert([{ ip_address: ip, reason: 'Admin Ban' }]);
-      alert("Target Neutralized.");
-  };
 
   // --- BROADCASTS ---
   const handleAddBroadcast = async (e) => {
@@ -261,7 +257,7 @@ export default function Marketplace() {
       await supabase.from('broadcasts').delete().eq('id', id);
   };
 
-  // --- POSTING (V2: Aggressive Sanitizer) ---
+  // --- POSTING (V2) ---
   const handlePost = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -369,16 +365,6 @@ export default function Marketplace() {
       }
   };
 
-  const handleBuyClick = async (product) => {
-      window.open(`https://wa.me/${product.whatsapp_number}`, '_blank');
-      if(!isAdmin) await supabase.rpc('increment_clicks', { row_id: product.id });
-  };
-  
-  const handleFulfillRequest = (req) => {
-      const text = `Hi, I saw your request on CampusMarket for "${req.title}". I have it available.`;
-      window.open(`https://wa.me/${req.whatsapp_number}?text=${encodeURIComponent(text)}`, '_blank');
-  };
-
   // --- RENDER ---
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -400,6 +386,17 @@ export default function Marketplace() {
           return getDistance(userLoc.lat, userLoc.lng, cA.lat, cA.lng) - getDistance(userLoc.lat, userLoc.lng, cB.lat, cB.lng);
       });
   }
+
+  // Group handlers to pass to child
+  const itemHandlers = {
+      handleBuyClick,
+      handleFulfillRequest,
+      handleExpungeProduct,
+      handleVerifyProduct,
+      handleExpungeRequest,
+      handleVerifyRequest,
+      setFullscreenImg
+  };
 
   return (
     <div className="min-h-screen pb-32 transition-colors duration-300">
@@ -437,18 +434,8 @@ export default function Marketplace() {
             </div>
 
             <div className="px-5 pb-2 flex gap-2">
-                <button 
-                    onClick={() => setViewMode('market')} 
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'market' ? 'bg-[var(--wa-teal)] text-white shadow-lg' : 'bg-[var(--surface)] text-gray-400'}`}
-                >
-                    Items For Sale
-                </button>
-                <button 
-                    onClick={() => setViewMode('requests')} 
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'requests' ? 'bg-[#8E44AD] text-white shadow-lg' : 'bg-[var(--surface)] text-gray-400'}`}
-                >
-                    Request Board
-                </button>
+                <button onClick={() => setViewMode('market')} className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'market' ? 'bg-[var(--wa-teal)] text-white shadow-lg' : 'bg-[var(--surface)] text-gray-400'}`}>Items For Sale</button>
+                <button onClick={() => setViewMode('requests')} className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'requests' ? 'bg-[#8E44AD] text-white shadow-lg' : 'bg-[var(--surface)] text-gray-400'}`}>Request Board</button>
             </div>
 
              <div className="px-5 pb-3 flex gap-3 overflow-x-auto scrollbar-hide pt-2">
@@ -467,105 +454,26 @@ export default function Marketplace() {
             </div>
         </header>
 
-        {/* FEED */}
-        <main id="feed">
+        {/* FEED (2-COLUMN GRID) */}
+        <main id="feed" className="grid grid-cols-2 gap-3 px-4 pb-20">
             {loading ? <p className="col-span-2 text-center py-10 opacity-40">Loading...</p> : 
              displayItems.length === 0 ? <p className="col-span-2 text-center py-10 opacity-40 text-sm font-bold">No items found here yet.</p> :
-             displayItems.map(item => {
-                
-                // --- MARKET CARD ---
-                if (viewMode === 'market') {
-                    const isSold = (item.click_count || 0) >= 5;
-                    const campData = CAMPUSES.find(c => c.id === item.campus);
-                    const dist = userLoc && campData ? getDistance(userLoc.lat, userLoc.lng, campData.lat, campData.lng).toFixed(1) + 'km' : item.campus;
-
-                    return (
-                        <div key={item.id} className={`product-card ${item.is_admin_post ? 'border-2 border-yellow-500' : ''}`}>
-                             {/* UPDATED: ASPECT-SQUARE & FULLSCREEN CLICK */}
-                             <div className="aspect-square bg-gray-200 relative group overflow-hidden cursor-pointer">
-                                <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-full h-full">
-                                    {item.images && item.images.length > 0 ? item.images.map((img, idx) => (
-                                        <img 
-                                            key={idx} 
-                                            src={img} 
-                                            onClick={() => setFullscreenImg(img)} 
-                                            className="w-full h-full object-cover flex-shrink-0 snap-center" 
-                                        />
-                                    )) : <img src="https://placehold.co/600x600/008069/white?text=No+Photo" className="w-full h-full object-cover" />}
-                                </div>
-                                {item.images?.length > 1 && <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">{item.images.map((_, i) => <div key={i} className="w-1.5 h-1.5 rounded-full bg-white/80 shadow-sm border border-black/10"></div>)}</div>}
-                                
-                                {isSold && <div className="absolute inset-0 bg-black/60 flex items-center justify-center"><span className="text-white font-black border-2 px-2 py-1 -rotate-12">SOLD OUT</span></div>}
-                                {item.is_verified && <div className="absolute top-2 right-2 bg-yellow-400 text-black text-[9px] font-black px-2 py-1 rounded-full shadow-lg border border-yellow-200 flex items-center gap-1"><span>🛡️</span>VERIFIED</div>}
-                            </div>
-                            
-                            <div className="p-4 flex-1 flex flex-col justify-between">
-                                <div>
-                                    <h3 className="text-[11px] font-extrabold uppercase truncate opacity-70 flex items-center gap-1">
-                                        {item.title}
-                                        {item.is_verified && <span className="text-yellow-500 text-sm">✓</span>}
-                                    </h3>
-                                    <p className="font-black text-sm text-[var(--wa-teal)] mt-1">₦{Number(item.price).toLocaleString()}</p>
-                                    <p className="text-[8px] font-bold text-gray-300 mt-1 uppercase">{dist}</p>
-                                </div>
-                                <button onClick={() => handleBuyClick(item)} disabled={isSold} className={`mt-3 block w-full text-center py-2.5 rounded-xl text-[10px] font-black uppercase transition tap ${isSold ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[var(--wa-teal)]/10 text-[var(--wa-teal)] hover:bg-[var(--wa-teal)] hover:text-white'}`}>{isSold ? 'Sold Out' : 'Chat Buy'}</button>
-                                
-                                {isAdmin && (
-                                    <div className="flex gap-2 mt-2">
-                                        <button onClick={() => handleExpungeProduct(item.id)} className="flex-1 bg-red-100 text-red-600 py-1 rounded text-[8px] font-black uppercase">Expunge</button>
-                                        <button onClick={() => handleVerifyProduct(item.id, item.is_verified)} className={`flex-1 py-1 rounded text-[8px] font-black uppercase ${item.is_verified ? 'bg-gray-200 text-gray-500' : 'bg-yellow-100 text-yellow-700'}`}>
-                                            {item.is_verified ? 'Un-Verify' : 'Verify'}
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    );
-                } 
-                
-                // --- REQUEST CARD ---
-                else {
-                    const campData = CAMPUSES.find(c => c.id === item.campus);
-                    const dist = userLoc && campData ? getDistance(userLoc.lat, userLoc.lng, campData.lat, campData.lng).toFixed(1) + 'km' : item.campus;
-                    
-                    return (
-                        <div key={item.id} className="product-card border-l-4 border-l-[#8E44AD]">
-                            <div className="p-5 flex flex-col h-full justify-between">
-                                <div className="relative">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className="bg-[#8E44AD]/10 text-[#8E44AD] text-[8px] font-black px-2 py-1 rounded uppercase">Request</span>
-                                        <span className="text-[8px] font-bold text-gray-300 uppercase">{dist}</span>
-                                    </div>
-                                    <h3 className="text-xs font-extrabold uppercase leading-tight mb-2 flex items-center gap-1">
-                                        {item.title}
-                                        {item.is_verified && <span className="text-yellow-500 text-sm">✓</span>}
-                                    </h3>
-                                    {/* CLICKABLE REQUEST IMAGE */}
-                                    {item.image_url && <img src={item.image_url} onClick={() => setFullscreenImg(item.image_url)} className="w-12 h-12 rounded-lg object-cover mb-2 border border-gray-100 cursor-pointer" />}
-                                    <p className="font-black text-sm text-gray-700">Budget: ₦{Number(item.budget).toLocaleString()}</p>
-                                    
-                                    {item.is_verified && <div className="absolute top-0 right-0 -mt-1"><span className="text-xl">🛡️</span></div>}
-                                </div>
-                                <button onClick={() => handleFulfillRequest(item)} className="mt-4 block w-full bg-[#8E44AD] text-white text-center py-2.5 rounded-xl text-[10px] font-black uppercase transition tap shadow-md">I Have This</button>
-                                
-                                {isAdmin && (
-                                    <div className="flex gap-2 mt-2">
-                                        <button onClick={() => handleExpungeRequest(item.id)} className="flex-1 bg-red-100 text-red-600 py-1 rounded text-[8px] font-black uppercase">Remove</button>
-                                        <button onClick={() => handleVerifyRequest(item.id, item.is_verified)} className={`flex-1 py-1 rounded text-[8px] font-black uppercase ${item.is_verified ? 'bg-gray-200 text-gray-500' : 'bg-yellow-100 text-yellow-700'}`}>
-                                            {item.is_verified ? 'Un-Verify' : 'Verify'}
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    );
-                }
-            })}
+             displayItems.map(item => (
+                 <ProductCard 
+                    key={item.id} 
+                    item={item} 
+                    viewMode={viewMode}
+                    isAdmin={isAdmin}
+                    userLoc={userLoc}
+                    campuses={CAMPUSES}
+                    handlers={itemHandlers}
+                 />
+            ))}
         </main>
 
         <button onClick={() => setShowModal(true)} className="fixed bottom-8 right-6 fab z-50 tap">+</button>
 
-        {/* ... MODALS ... */}
+        {/* ... MODALS (Posting, Admin, Pro, Login, Fullscreen) ... */}
         {showModal && (
             <div className="fixed inset-0 bg-black/60 z-[100] flex items-end backdrop-blur-sm">
                 <div className="glass-3d w-full p-6 rounded-t-[32px] animate-slide-up max-h-[85vh] overflow-y-auto">
@@ -607,7 +515,6 @@ export default function Marketplace() {
             </div>
         )}
 
-        {/* ... ADMIN PANEL ... */}
         {showAdminPanel && (
             <div className="fixed inset-0 z-[200] bg-white dark:bg-black overflow-y-auto">
                 <div className="p-6">
@@ -652,7 +559,6 @@ export default function Marketplace() {
             </div>
         )}
         
-        {/* ... PRO MODAL & LOGIN MODAL ... */}
         {showProModal && (
             <div className="fixed inset-0 z-[140] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-fade-in">
                 <div className="glass-3d w-full max-w-sm p-8 text-center relative">
@@ -679,7 +585,7 @@ export default function Marketplace() {
             </div>
         )}
 
-        {/* --- NEW: LIGHTBOX MODAL --- */}
+        {/* LIGHTBOX MODAL */}
         {fullscreenImg && (
             <div className="fixed inset-0 z-[300] bg-black flex items-center justify-center animate-fade-in">
                 <button onClick={() => setFullscreenImg(null)} className="absolute top-5 right-5 text-white text-3xl font-bold bg-white/10 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md z-50 tap">×</button>
