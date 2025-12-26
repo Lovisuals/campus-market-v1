@@ -8,7 +8,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import confetti from 'canvas-confetti';
 
 // --- ERROR BOUNDARY ---
 class ErrorBoundary extends React.Component<any, any> {
@@ -29,7 +28,7 @@ class ErrorBoundary extends React.Component<any, any> {
           <h1 className="text-2xl font-bold">⚠️ SYSTEM ERROR</h1>
           <p className="mt-2">{this.state.error?.toString()}</p>
           <button 
-            onClick={() => window.location.reload()} 
+            onClick={() => typeof window !== 'undefined' && window.location.reload()} 
             className="mt-4 bg-red-600 text-white px-6 py-2 rounded-lg font-bold"
           >
             RELOAD SYSTEM
@@ -41,10 +40,42 @@ class ErrorBoundary extends React.Component<any, any> {
   }
 }
 
-// --- CONFIG ---
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+// --- SAFE CONFIG & UTILS ---
+
+// Lazy load Supabase to prevent build-time crashes if env vars are missing
+let supabaseInstance: any = null;
+const getSupabase = () => {
+    if (supabaseInstance) return supabaseInstance;
+    
+    // Safety check for build time
+    if (typeof window === 'undefined') return null;
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!url || !key) {
+        console.error("Supabase Environment Variables Missing");
+        return null;
+    }
+
+    supabaseInstance = createClient(url, key);
+    return supabaseInstance;
+};
+
+// Lazy load Confetti
+const fireConfetti = async () => {
+    if (typeof window === 'undefined') return;
+    try {
+        const confetti = (await import('canvas-confetti')).default;
+        confetti({
+            particleCount: 150,
+            spread: 70,
+            origin: { y: 0.6 }
+        });
+    } catch (e) {
+        console.error("Confetti failed", e);
+    }
+};
 
 const CAMPUSES = [
   { id: 'All', name: 'All Campuses' },
@@ -58,7 +89,6 @@ const CAMPUSES = [
   { id: 'UNN', name: 'UNN' }, { id: 'ABU', name: 'ABU Zaria' }
 ];
 
-// --- HELPER: IMAGE COMPRESSION ---
 const compressImage = async (file: File) => {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -195,7 +225,7 @@ function MarketplaceLogic() {
   const galleryRef = useRef<HTMLDivElement>(null); 
 
   useEffect(() => {
-    // Client-side only check for window
+    // 1. Guard Window access
     if (typeof window !== 'undefined') {
         const savedTheme = localStorage.getItem('sentinel_theme');
         if (savedTheme === 'dark') {
@@ -208,18 +238,19 @@ function MarketplaceLogic() {
             document.documentElement.classList.remove('dark');
             localStorage.setItem('sentinel_theme', 'light');
         }
+        
+        fetch('https://api.ipify.org?format=json').then(res => res.json()).then(data => setClientIp(data.ip)).catch(() => {});
     }
+
+    // 2. Safe Supabase Call
+    const client = getSupabase();
+    if (!client) return;
 
     fetchProducts();
     fetchRequests();
     fetchBroadcasts();
     
-    // Lazy load IP to prevent build blocking
-    if (typeof window !== 'undefined') {
-        fetch('https://api.ipify.org?format=json').then(res => res.json()).then(data => setClientIp(data.ip)).catch(() => {});
-    }
-    
-    const channel = supabase.channel('realtime_feed')
+    const channel = client.channel('realtime_feed')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload: any) => {
         if(payload.eventType === 'INSERT') setProducts(prev => [payload.new, ...prev]);
         else if (payload.eventType === 'DELETE') setProducts(prev => prev.filter(p => p.id !== payload.old.id));
@@ -232,10 +263,9 @@ function MarketplaceLogic() {
     })
     .subscribe();
 
-    return () => { supabase.removeChannel(channel); }
+    return () => { client.removeChannel(channel); }
   }, []);
 
-  // Check admin session on mount
   useEffect(() => {
       checkAdminSession();
   }, []);
@@ -247,12 +277,16 @@ function MarketplaceLogic() {
   }, [lightboxData]);
 
   const checkAdminSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const client = getSupabase();
+      if (!client) return;
+      const { data: { session } } = await client.auth.getSession();
       if (session) setIsAdmin(true);
   };
 
   const fetchBroadcasts = async () => {
-      const { data } = await supabase.from('broadcasts').select('*').order('created_at', { ascending: false });
+      const client = getSupabase();
+      if (!client) return;
+      const { data } = await client.from('broadcasts').select('*').order('created_at', { ascending: false });
       if(data) {
           setBroadcasts(data);
           const activeMsgs = data.filter((b: any) => b.is_active).map((b: any) => b.message).join(' • ');
@@ -261,43 +295,62 @@ function MarketplaceLogic() {
   }
 
   const fetchProducts = async () => {
-    const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+    const client = getSupabase();
+    if (!client) return;
+    const { data } = await client.from('products').select('*').order('created_at', { ascending: false });
     if (data) setProducts(data);
     setLoading(false);
   };
 
   const fetchRequests = async () => {
-    const { data } = await supabase.from('requests').select('*').order('created_at', { ascending: false });
+    const client = getSupabase();
+    if (!client) return;
+    const { data } = await client.from('requests').select('*').order('created_at', { ascending: false });
     if (data) setRequests(data);
   };
 
   const toggleTheme = () => {
       const newMode = !darkMode;
       setDarkMode(newMode);
-      if(newMode) {
-          document.body.classList.add('dark-mode');
-          document.documentElement.classList.add('dark'); 
-          localStorage.setItem('sentinel_theme', 'dark');
-      } else {
-          document.body.classList.remove('dark-mode');
-          document.documentElement.classList.remove('dark'); 
-          localStorage.setItem('sentinel_theme', 'light');
+      if (typeof window !== 'undefined') {
+        if(newMode) {
+            document.body.classList.add('dark-mode');
+            document.documentElement.classList.add('dark'); 
+            localStorage.setItem('sentinel_theme', 'dark');
+        } else {
+            document.body.classList.remove('dark-mode');
+            document.documentElement.classList.remove('dark'); 
+            localStorage.setItem('sentinel_theme', 'light');
+        }
       }
   };
 
   const handlers = {
       handleBuyClick: async (product: any) => {
           if (typeof window !== 'undefined') window.open(`https://wa.me/${product.whatsapp_number}`, '_blank');
-          if(!isAdmin) await supabase.rpc('increment_clicks', { row_id: product.id });
+          const client = getSupabase();
+          if(!isAdmin && client) await client.rpc('increment_clicks', { row_id: product.id });
       },
       handleFulfillRequest: (req: any) => {
           const text = `Hi, I saw your request on CampusMarket for "${req.title}". I have it available.`;
           if (typeof window !== 'undefined') window.open(`https://wa.me/${req.whatsapp_number}?text=${encodeURIComponent(text)}`, '_blank');
       },
-      handleExpungeProduct: async (id: any) => { if(confirm("DELETE ITEM?")) await supabase.from('products').delete().eq('id', id); },
-      handleVerifyProduct: async (id: any, status: boolean) => { await supabase.from('products').update({ is_verified: !status }).eq('id', id); },
-      handleExpungeRequest: async (id: any) => { if(confirm("DELETE REQUEST?")) await supabase.from('requests').delete().eq('id', id); },
-      handleVerifyRequest: async (id: any, status: boolean) => { await supabase.from('requests').update({ is_verified: !status }).eq('id', id); },
+      handleExpungeProduct: async (id: any) => { 
+          const client = getSupabase();
+          if(confirm("DELETE ITEM?") && client) await client.from('products').delete().eq('id', id); 
+      },
+      handleVerifyProduct: async (id: any, status: boolean) => { 
+          const client = getSupabase();
+          if(client) await client.from('products').update({ is_verified: !status }).eq('id', id); 
+      },
+      handleExpungeRequest: async (id: any) => { 
+          const client = getSupabase();
+          if(confirm("DELETE REQUEST?") && client) await client.from('requests').delete().eq('id', id); 
+      },
+      handleVerifyRequest: async (id: any, status: boolean) => { 
+          const client = getSupabase();
+          if(client) await client.from('requests').update({ is_verified: !status }).eq('id', id); 
+      },
       openLightbox: (item: any, index: number) => {
           const imgs = item.images || (item.image_url ? [item.image_url] : []);
           if (imgs.length > 0) setLightboxData({ images: imgs, startIndex: index });
@@ -307,6 +360,13 @@ function MarketplaceLogic() {
   const handlePost = async (e: any) => {
     e.preventDefault();
     setSubmitting(true);
+    const client = getSupabase();
+    if (!client) {
+        alert("System not ready. Refresh.");
+        setSubmitting(false);
+        return;
+    }
+
     const sanitizePhone = (input: string) => {
         let clean = input.replace(/\D/g, ''); 
         if (clean.startsWith('2340')) clean = '234' + clean.substring(4);
@@ -319,11 +379,11 @@ function MarketplaceLogic() {
         let finalPhone;
         try { finalPhone = sanitizePhone(form.whatsapp); } catch (phoneErr: any) { alert(phoneErr.message); setSubmitting(false); return; }
         
-        const { data: banned } = await supabase.from('blacklist').select('ip_address').eq('ip_address', clientIp).maybeSingle();
+        const { data: banned } = await client.from('blacklist').select('ip_address').eq('ip_address', clientIp).maybeSingle();
         if(banned) { alert("Connection Refused."); setSubmitting(false); return; }
 
         if (!isAdmin) {
-            const { data: proData } = await supabase.from('verified_sellers').select('limit_per_day').eq('phone', finalPhone).maybeSingle();
+            const { data: proData } = await client.from('verified_sellers').select('limit_per_day').eq('phone', finalPhone).maybeSingle();
             const dailyLimit = proData ? proData.limit_per_day : 3;
             const today = new Date().toLocaleDateString();
             const quota = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('post_quota') || '{}') : {};
@@ -336,9 +396,9 @@ function MarketplaceLogic() {
             for (let i = 0; i < imageFiles.length; i++) {
                 const compressedBlob = await compressImage(imageFiles[i]);
                 const filename = `${postType}_${Date.now()}_${i}`;
-                const { error: uploadError } = await supabase.storage.from('item-images').upload(filename, compressedBlob);
+                const { error: uploadError } = await client.storage.from('item-images').upload(filename, compressedBlob);
                 if (!uploadError) {
-                    const { data: { publicUrl } } = supabase.storage.from('item-images').getPublicUrl(filename);
+                    const { data: { publicUrl } } = client.storage.from('item-images').getPublicUrl(filename);
                     finalImageUrls.push(publicUrl);
                 }
             }
@@ -350,7 +410,7 @@ function MarketplaceLogic() {
             ? { title: form.title, price: form.price, whatsapp_number: finalPhone, campus: form.campus, item_type: form.type, images: finalImageUrls.length > 0 ? finalImageUrls : ["https://placehold.co/600x600/008069/white?text=No+Photo"], is_admin_post: isAdmin, ip_address: clientIp, user_agent: navigator.userAgent, is_verified: false }
             : { title: form.title, budget: form.price, whatsapp_number: finalPhone, campus: form.campus, image_url: finalImageUrls[0] || null, ip_address: clientIp, is_verified: false };
         
-        const { error } = await supabase.from(table).insert([payload]);
+        const { error } = await client.from(table).insert([payload]);
         if (error) throw error;
 
         const today = new Date().toLocaleDateString();
@@ -360,7 +420,7 @@ function MarketplaceLogic() {
             localStorage.setItem('post_quota', JSON.stringify({ date: today, count: newCount }));
         }
 
-        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+        await fireConfetti(); // LAZY LOADED
         setShowModal(false);
         setForm({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
         setImageFiles([]); setPreviewUrls([]);
@@ -378,13 +438,12 @@ function MarketplaceLogic() {
 
   const handleLogoTouchStart = () => { holdTimer.current = setTimeout(() => { if (typeof window !== 'undefined' && navigator.vibrate) navigator.vibrate(200); setShowLogin(true); }, 2000); };
   const handleLogoTouchEnd = () => clearTimeout(holdTimer.current);
-  const handleAdminLogin = async (e: any) => { e.preventDefault(); const { error } = await supabase.auth.signInWithPassword({ email: e.target.email.value, password: e.target.password.value }); if (!error) { setIsAdmin(true); setShowLogin(false); setShowAdminPanel(true); } else { alert("Access Denied"); } };
-  const handleLogout = async () => { await supabase.auth.signOut(); setIsAdmin(false); setShowAdminPanel(false); window.location.reload(); };
-  const runSystemCleanup = async () => { const { data, error } = await supabase.rpc('run_quant_cleanup'); if(error) { alert("Cleanup Failed: " + error.message); } else { setSystemReport(data); fetchProducts(); fetchRequests(); } };
-  const handleAddBroadcast = async (e: any) => { e.preventDefault(); const msg = e.target.message.value; if(!msg) return; await supabase.from('broadcasts').insert([{ message: msg, is_active: true }]); e.target.reset(); };
-  const toggleBroadcast = async (id: any, currentStatus: boolean) => { await supabase.from('broadcasts').update({ is_active: !currentStatus }).eq('id', id); };
-  // FIXED LOGIC: Only delete if user confirms
-  const deleteBroadcast = async (id: any) => { if(confirm("Delete?")) { await supabase.from('broadcasts').delete().eq('id', id); } };
+  const handleAdminLogin = async (e: any) => { e.preventDefault(); const client = getSupabase(); if(!client) return; const { error } = await client.auth.signInWithPassword({ email: e.target.email.value, password: e.target.password.value }); if (!error) { setIsAdmin(true); setShowLogin(false); setShowAdminPanel(true); } else { alert("Access Denied"); } };
+  const handleLogout = async () => { const client = getSupabase(); if(client) await client.auth.signOut(); setIsAdmin(false); setShowAdminPanel(false); window.location.reload(); };
+  const runSystemCleanup = async () => { const client = getSupabase(); if(!client) return; const { data, error } = await client.rpc('run_quant_cleanup'); if(error) { alert("Cleanup Failed: " + error.message); } else { setSystemReport(data); fetchProducts(); fetchRequests(); } };
+  const handleAddBroadcast = async (e: any) => { e.preventDefault(); const client = getSupabase(); if(!client) return; const msg = e.target.message.value; if(!msg) return; await client.from('broadcasts').insert([{ message: msg, is_active: true }]); e.target.reset(); };
+  const toggleBroadcast = async (id: any, currentStatus: boolean) => { const client = getSupabase(); if(client) await client.from('broadcasts').update({ is_active: !currentStatus }).eq('id', id); };
+  const deleteBroadcast = async (id: any) => { const client = getSupabase(); if(confirm("Delete?") && client) { await client.from('broadcasts').delete().eq('id', id); } };
 
   const filterList = (list: any[]) => {
       return list.filter(item => {
