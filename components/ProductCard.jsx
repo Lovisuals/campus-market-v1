@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 // HELPER: Calculate Distance
 const getDistance = (lat1, lon1, lat2, lon2) => {
