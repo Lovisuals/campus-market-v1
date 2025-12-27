@@ -7,11 +7,9 @@ import confetti from 'canvas-confetti';
 import ProductCard from './ProductCard';
 
 // ============================================================================
-// 🛠️ ZONE 1: THE OVERRIDE COCKPIT (EDIT HERE SAFELY)
+// 🛠️ ZONE 1: THE OVERRIDE COCKPIT
 // ============================================================================
 
-// 1. CAMPUS LIST (Add/Remove Schools here)
-//    Format: { id: 'SHORTCODE', name: 'Display Name', lat: Latitude, lng: Longitude }
 const CAMPUSES = [
   { id: 'All', name: 'All Campuses', lat: 0, lng: 0 },
   { id: 'UNILAG', name: 'UNILAG', lat: 6.5157, lng: 3.3899 },
@@ -20,7 +18,7 @@ const CAMPUSES = [
   { id: 'TASUED', name: 'TASUED', lat: 6.7967, lng: 3.9275 },
   { id: 'OOU', name: 'OOU (Ago-Iwoye)', lat: 6.9427, lng: 3.9175 },
   { id: 'UNIPORT', name: 'UNIPORT', lat: 4.9069, lng: 6.9170 },
-  { id: 'UNIDEL', name: 'UNIDEL (Agbor)', lat: 6.2536, lng: 6.1978 },
+  { id: 'UNIDEL', name: 'UNIDEL', lat: 6.2536, lng: 6.1978 },
   { id: 'UNIBEN', name: 'UNIBEN', lat: 6.3350, lng: 5.6037 },
   { id: 'UI', name: 'UI (Ibadan)', lat: 7.4443, lng: 3.9008 },
   { id: 'OAU', name: 'OAU (Ife)', lat: 7.5180, lng: 4.5276 },
@@ -32,22 +30,20 @@ const CAMPUSES = [
   { id: 'ABU', name: 'ABU Zaria', lat: 11.1517, lng: 7.6492 }
 ];
 
-// 2. SYSTEM SETTINGS
 const CONFIG = {
-    DEFAULT_TICKER: "CAMPUS MARKETPLACE • BUY & SELL SAFELY", // Fallback if no broadcasts
-    MAX_IMAGES: 3,                 // Max photos per post
-    DAILY_POST_LIMIT: 3,           // Non-admin posts per day
-    COMPRESSION_QUALITY: 0.8,      // Image quality (0.1 to 1.0)
-    HOLD_TO_LOGIN_MS: 2000,        // How long to hold logo for admin login (ms)
-    ANIMATION_SPEED: 150,          // Confetti particle count
-    PHONE_PREFIX: '234'            // Nigeria Country Code
+    DEFAULT_TICKER: "CAMPUS MARKETPLACE • BUY & SELL SAFELY", 
+    MAX_IMAGES: 3,                 
+    DAILY_POST_LIMIT: 3,           
+    COMPRESSION_QUALITY: 0.8,      
+    HOLD_TO_LOGIN_MS: 2000,        
+    ANIMATION_SPEED: 150,          
+    PHONE_PREFIX: '234'            
 };
 
-// 3. ADMIN PRO LINKS
-const PRO_LINK = "https://wa.me/2347068516779?text=I%20want%20to%20upgrade%20to%20Campus%20PRO";
+const ADMIN_CONTACT = "https://wa.me/2347068516779?text=I%20need%20a%20Pro%20Access%20Code";
 
 // ============================================================================
-// ⚠️ ZONE 2: THE LOGIC CORE (DO NOT EDIT UNLESS YOU KNOW CODE)
+// ⚠️ ZONE 2: THE LOGIC CORE
 // ============================================================================
 
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -91,24 +87,34 @@ export default function Marketplace() {
   const [requests, setRequests] = useState<any[]>([]); 
   const [viewMode, setViewMode] = useState('market'); 
   const [fullscreenImg, setFullscreenImg] = useState<string | null>(null);
-  
   const [loading, setLoading] = useState(true);
   const [activeCampus, setActiveCampus] = useState('All');
+  
+  // MODALS
   const [showModal, setShowModal] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
-  const [showProModal, setShowProModal] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [showCodeInput, setShowCodeInput] = useState(false);
+  const [showKYCForm, setShowKYCForm] = useState(false);
+  
+  // AUTH & SYSTEM
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isProUser, setIsProUser] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [userLoc, setUserLoc] = useState<{lat: number, lng: number} | null>(null);
   const [tickerMsg, setTickerMsg] = useState('');
   const [broadcasts, setBroadcasts] = useState<any[]>([]);
+  const [verifiedUsers, setVerifiedUsers] = useState<any[]>([]); 
   const [clientIp, setClientIp] = useState('0.0.0.0');
   const [systemReport, setSystemReport] = useState<any>(null);
+  const [generatedCode, setGeneratedCode] = useState('');
 
-  // FORM STATE
+  // FORMS
   const [postType, setPostType] = useState('sell'); 
   const [form, setForm] = useState({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
+  const [kycForm, setKycForm] = useState({ fullName: '', school: '', dept: '', level: '', address: '', gName: '', gPhone: '', phone: '' });
+  const [accessCode, setAccessCode] = useState('');
+  
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -124,20 +130,17 @@ export default function Marketplace() {
     fetchBroadcasts();
 
     const savedTheme = localStorage.getItem('sentinel_theme');
-    if (savedTheme === 'dark') {
-        setDarkMode(true);
-        document.body.classList.add('dark-mode');
-    }
+    if (savedTheme === 'dark') { setDarkMode(true); document.body.classList.add('dark-mode'); }
 
     fetch('https://api.ipify.org?format=json').then(res => res.json()).then(data => setClientIp(data.ip)).catch(() => {});
-    
     if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(pos => {
-            setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        });
+        navigator.geolocation.getCurrentPosition(pos => { setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }); });
     }
 
     checkAdminSession();
+    // Basic local check (visual only), real check happens on Post
+    const storedPro = localStorage.getItem('campus_pro_user');
+    if(storedPro) setIsProUser(true);
 
     const channel = supabase.channel('realtime_feed')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload: any) => {
@@ -157,9 +160,21 @@ export default function Marketplace() {
 
   const checkAdminSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) setIsAdmin(true);
+      if (session) {
+          setIsAdmin(true);
+          fetchVerifiedUsers(); 
+      }
   };
 
+  const fetchProducts = async () => {
+    const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+    if (data) setProducts(data);
+    setLoading(false);
+  };
+  const fetchRequests = async () => {
+    const { data } = await supabase.from('requests').select('*').order('created_at', { ascending: false });
+    if (data) setRequests(data);
+  };
   const fetchBroadcasts = async () => {
       const { data } = await supabase.from('broadcasts').select('*').order('created_at', { ascending: false });
       if(data) {
@@ -168,117 +183,90 @@ export default function Marketplace() {
           setTickerMsg(activeMsgs || CONFIG.DEFAULT_TICKER);
       }
   }
-
-  const fetchProducts = async () => {
-    const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
-    if (data) setProducts(data);
-    setLoading(false);
-  };
-
-  const fetchRequests = async () => {
-    const { data } = await supabase.from('requests').select('*').order('created_at', { ascending: false });
-    if (data) setRequests(data);
-  };
+  const fetchVerifiedUsers = async () => {
+      const { data } = await supabase.from('verified_sellers').select('*').order('created_at', { ascending: false });
+      if(data) setVerifiedUsers(data);
+  }
 
   const toggleTheme = () => {
       const newMode = !darkMode;
       setDarkMode(newMode);
-      if(newMode) {
-          document.body.classList.add('dark-mode');
-          localStorage.setItem('sentinel_theme', 'dark');
+      if(newMode) { document.body.classList.add('dark-mode'); localStorage.setItem('sentinel_theme', 'dark'); } 
+      else { document.body.classList.remove('dark-mode'); localStorage.setItem('sentinel_theme', 'light'); }
+  };
+
+  // --- PRO SYSTEM LOGIC ---
+  const handleGenerateCode = async () => {
+      const code = 'PRO-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+      const { error } = await supabase.from('access_codes').insert([{ code, created_by: 'admin' }]);
+      if(!error) setGeneratedCode(code);
+      else alert("Gen Failed");
+  };
+
+  const handleVerifyCode = async (e: any) => {
+      e.preventDefault();
+      const { data, error } = await supabase.from('access_codes').select('*').eq('code', accessCode).eq('is_used', false).maybeSingle();
+      if (data) {
+          setShowCodeInput(false);
+          setShowKYCForm(true); 
       } else {
-          document.body.classList.remove('dark-mode');
-          localStorage.setItem('sentinel_theme', 'light');
+          alert("Invalid or Used Code");
       }
   };
 
-  // --- HANDLERS ---
-  const handleBuyClick = async (product: any) => {
-      window.open(`https://wa.me/${product.whatsapp_number}`, '_blank');
-      if(!isAdmin) await supabase.rpc('increment_clicks', { row_id: product.id });
-  };
-  const handleFulfillRequest = (req: any) => {
-      const text = `Hi, I saw your request on CampusMarket for "${req.title}". I have it available.`;
-      window.open(`https://wa.me/${req.whatsapp_number}?text=${encodeURIComponent(text)}`, '_blank');
-  };
-  const handleExpungeProduct = async (id: any) => {
-      if(!confirm("DELETE ITEM?")) return;
-      await supabase.from('products').delete().eq('id', id);
-  };
-  const handleVerifyProduct = async (id: any, currentStatus: boolean) => {
-      const { error } = await supabase.from('products').update({ is_verified: !currentStatus }).eq('id', id);
-      if(error) alert("Update Failed: " + error.message);
-  };
-  const handleExpungeRequest = async (id: any) => {
-      if(!confirm("DELETE REQUEST?")) return;
-      await supabase.from('requests').delete().eq('id', id);
-  };
-  const handleVerifyRequest = async (id: any, currentStatus: boolean) => {
-      const { error } = await supabase.from('requests').update({ is_verified: !currentStatus }).eq('id', id);
-      if(error) alert("Update Failed: " + error.message);
-  }
-
-  // --- ACTIONS ---
-  const handleLogoTouchStart = () => {
-      holdTimer.current = setTimeout(() => {
-          if (navigator.vibrate) navigator.vibrate(200);
-          setShowLogin(true);
-      }, CONFIG.HOLD_TO_LOGIN_MS);
-  };
-  const handleLogoTouchEnd = () => {
-      if(holdTimer.current) clearTimeout(holdTimer.current);
-  };
-
-  const handleAdminLogin = async (e: any) => {
+  const handleKYCSubmit = async (e: any) => {
       e.preventDefault();
-      const { error } = await supabase.auth.signInWithPassword({ 
-          email: e.target.email.value, 
-          password: e.target.password.value 
-      });
+      setSubmitting(true);
+      
+      const sanitizePhone = (input: string) => {
+        let clean = input.replace(/\D/g, ''); 
+        if (clean.startsWith('2340')) clean = CONFIG.PHONE_PREFIX + clean.substring(4);
+        if (clean.length === 11 && clean.startsWith('0')) clean = CONFIG.PHONE_PREFIX + clean.substring(1);
+        if (clean.length === 10 && (clean.startsWith('8') || clean.startsWith('7') || clean.startsWith('9'))) clean = CONFIG.PHONE_PREFIX + clean;
+        return clean;
+      };
+
+      const finalKycPhone = sanitizePhone(kycForm.phone);
+
+      // 1. Mark code used (Linked to this phone)
+      await supabase.from('access_codes').update({ is_used: true, used_by_phone: finalKycPhone }).eq('code', accessCode);
+      
+      // 2. Save User
+      const { error } = await supabase.from('verified_sellers').insert([{
+          user_phone: finalKycPhone,
+          full_name: kycForm.fullName,
+          school: kycForm.school,
+          department: kycForm.dept,
+          level: kycForm.level,
+          address: kycForm.address,
+          guarantor_name: kycForm.gName,
+          guarantor_phone: kycForm.gPhone,
+          is_active: true
+      }]);
+      
+      setSubmitting(false);
       if (!error) {
-          setIsAdmin(true);
-          setShowLogin(false);
-          setShowAdminPanel(true);
+          alert("Verification Successful! You are now Pro.");
+          localStorage.setItem('campus_pro_user', 'true');
+          setIsProUser(true);
+          setShowKYCForm(false);
       } else {
-          alert("Access Denied");
+          alert("Verification Error: " + error.message);
       }
   };
-
-  const handleLogout = async () => {
-      await supabase.auth.signOut();
-      setIsAdmin(false);
-      setShowAdminPanel(false);
-      window.location.reload();
+  
+  // ADMIN TOGGLE USER
+  const toggleUserStatus = async (id: any, currentStatus: boolean) => {
+      await supabase.from('verified_sellers').update({ is_active: !currentStatus }).eq('id', id);
+      fetchVerifiedUsers();
   };
 
-  const runSystemCleanup = async () => {
-      const { data, error } = await supabase.rpc('run_quant_cleanup');
-      if(error) {
-          alert("Cleanup Failed: " + error.message);
-      } else {
-          setSystemReport(data);
-          fetchProducts();
-          fetchRequests();
-      }
-  }
-
-  // --- BROADCASTS ---
-  const handleAddBroadcast = async (e: any) => {
-      e.preventDefault();
-      const msg = e.target.message.value;
-      if(!msg) return;
-      await supabase.from('broadcasts').insert([{ message: msg, is_active: true }]);
-      e.target.reset();
-  };
-  const toggleBroadcast = async (id: any, currentStatus: boolean) => {
-      await supabase.from('broadcasts').update({ is_active: !currentStatus }).eq('id', id);
-  };
-  const deleteBroadcast = async (id: any) => {
-      if(!confirm("Delete?")) return;
-      await supabase.from('broadcasts').delete().eq('id', id);
+  const handleSellFastClick = () => {
+      if (isProUser) { setPostType('sell'); setShowModal(true); } 
+      else { setShowCodeInput(true); }
   };
 
-  // --- POSTING ---
+  // --- POSTING (WITH SECURITY LOOP) ---
   const handlePost = async (e: any) => {
     e.preventDefault();
     setSubmitting(true);
@@ -288,31 +276,38 @@ export default function Marketplace() {
         if (clean.startsWith('2340')) clean = CONFIG.PHONE_PREFIX + clean.substring(4);
         if (clean.length === 11 && clean.startsWith('0')) clean = CONFIG.PHONE_PREFIX + clean.substring(1);
         if (clean.length === 10 && (clean.startsWith('8') || clean.startsWith('7') || clean.startsWith('9'))) clean = CONFIG.PHONE_PREFIX + clean;
-        if (clean.length !== 13 || !clean.startsWith(CONFIG.PHONE_PREFIX)) throw new Error(`Invalid Phone Number. Use format: 08012345678`);
         return clean;
     };
     
     try {
-        let finalPhone;
-        try {
-            finalPhone = sanitizePhone(form.whatsapp);
-        } catch (phoneErr: any) {
-            alert(phoneErr.message); 
-            setSubmitting(false); 
-            return; 
-        }
-
+        const finalPhone = sanitizePhone(form.whatsapp);
         const { data: banned } = await supabase.from('blacklist').select('ip_address').eq('ip_address', clientIp).maybeSingle();
         if(banned) { alert("Connection Refused."); setSubmitting(false); return; }
         
+        let verifiedStatus = false;
+
+        // SECURITY CHECK: If user claims Pro, VERIFY PHONE IN DATABASE
+        if (isProUser || !isAdmin) {
+             const { data: proData } = await supabase.from('verified_sellers').select('*').eq('user_phone', finalPhone).eq('is_active', true).maybeSingle();
+             if (proData) {
+                 verifiedStatus = true;
+             } else {
+                 if (isProUser) {
+                    if(!confirm("Warning: This number is not linked to your Pro Account. You will post as a Standard User (Limited). Continue?")) {
+                        setSubmitting(false); return;
+                    }
+                    verifiedStatus = false;
+                 }
+             }
+        }
+        
         // CHECK QUOTA
-        if (!isAdmin) {
+        if (!isAdmin && !verifiedStatus) {
             const today = new Date().toLocaleDateString();
             const quota = JSON.parse(localStorage.getItem('post_quota') || '{}');
             if (quota.date === today && quota.count >= CONFIG.DAILY_POST_LIMIT) {
-                alert(`Daily Limit of ${CONFIG.DAILY_POST_LIMIT} posts reached!`); 
-                setSubmitting(false); 
-                return;
+                alert(`Daily Limit Reached! Use "Sell Fast" or verify this number.`); 
+                setSubmitting(false); return;
             }
         }
 
@@ -331,25 +326,23 @@ export default function Marketplace() {
         }
 
         setUploadStatus('Publishing...');
+        const payload = {
+            title: form.title,
+            price: form.price, // FIXED: removed implicit any
+            whatsapp_number: finalPhone, 
+            campus: form.campus,
+            item_type: form.type,
+            images: finalImageUrls.length > 0 ? finalImageUrls : ["https://placehold.co/600x600/008069/white?text=No+Photo"],
+            is_verified: verifiedStatus, 
+            is_pro_post: verifiedStatus  
+        };
+
         if (postType === 'sell') {
-            const { error } = await supabase.from('products').insert([{
-                title: form.title,
-                price: form.price,
-                whatsapp_number: finalPhone, 
-                campus: form.campus,
-                item_type: form.type,
-                images: finalImageUrls.length > 0 ? finalImageUrls : ["https://placehold.co/600x600/008069/white?text=No+Photo"],
-                is_verified: false
-            }]);
+            const { error } = await supabase.from('products').insert([payload]);
             if (error) throw error;
         } else {
             const { error } = await supabase.from('requests').insert([{
-                title: form.title,
-                budget: form.price, 
-                whatsapp_number: finalPhone, 
-                campus: form.campus,
-                image_url: finalImageUrls[0] || null, 
-                is_verified: false
+                ...payload, budget: form.price, image_url: finalImageUrls[0]
             }]);
             if (error) throw error;
         }
@@ -376,17 +369,58 @@ export default function Marketplace() {
     }
   };
 
+  // --- ACTIONS ---
+  const handleLogoTouchStart = () => { holdTimer.current = setTimeout(() => { setShowLogin(true); }, CONFIG.HOLD_TO_LOGIN_MS); };
+  const handleLogoTouchEnd = () => { if(holdTimer.current) clearTimeout(holdTimer.current); };
+  const handleAdminLogin = async (e: any) => {
+      e.preventDefault();
+      const { error } = await supabase.auth.signInWithPassword({ email: e.target.email.value, password: e.target.password.value });
+      if (!error) { setIsAdmin(true); setShowLogin(false); setShowAdminPanel(true); fetchVerifiedUsers(); } 
+      else { alert("Access Denied"); }
+  };
+  const handleLogout = async () => { await supabase.auth.signOut(); setIsAdmin(false); setShowAdminPanel(false); window.location.reload(); };
+  const runSystemCleanup = async () => {
+      const { data, error } = await supabase.rpc('run_quant_cleanup');
+      if(error) { alert("Cleanup Failed: " + error.message); } 
+      else { setSystemReport(data); fetchProducts(); fetchRequests(); }
+  }
+
+  // --- HANDLERS (DEFINED BEFORE USE) ---
+  const handleBuyClick = async (product: any) => {
+      window.open(`https://wa.me/${product.whatsapp_number}`, '_blank');
+      if(!isAdmin) await supabase.rpc('increment_clicks', { row_id: product.id });
+  };
+  const handleFulfillRequest = (req: any) => {
+      const text = `Hi, I saw your request on CampusMarket for "${req.title}". I have it available.`;
+      window.open(`https://wa.me/${req.whatsapp_number}?text=${encodeURIComponent(text)}`, '_blank');
+  };
+  const handleExpungeProduct = async (id: any) => {
+      if(!confirm("DELETE ITEM?")) return;
+      await supabase.from('products').delete().eq('id', id);
+  };
+  const handleVerifyProduct = async (id: any, currentStatus: boolean) => {
+      const { error } = await supabase.from('products').update({ is_verified: !currentStatus }).eq('id', id);
+      if(error) alert("Update Failed: " + error.message);
+  };
+  const handleExpungeRequest = async (id: any) => {
+      if(!confirm("DELETE REQUEST?")) return;
+      await supabase.from('requests').delete().eq('id', id);
+  };
+  const handleVerifyRequest = async (id: any, currentStatus: boolean) => {
+      const { error } = await supabase.from('requests').update({ is_verified: !currentStatus }).eq('id', id);
+      if(error) alert("Update Failed: " + error.message);
+  }
+
+  // --- RENDER HELPERS ---
   const handleImageSelect = (e: any) => {
       const files = Array.from(e.target.files).slice(0, CONFIG.MAX_IMAGES) as File[];
-      if (files.length > 0) {
-          setImageFiles(files);
-          setPreviewUrls(files.map(file => URL.createObjectURL(file)));
-      }
+      if (files.length > 0) { setImageFiles(files); setPreviewUrls(files.map(file => URL.createObjectURL(file))); }
   };
-
-  // --- RENDER ---
+  
+  // Handlers Bundle (Must be after definitions)
+  const itemHandlers = { handleBuyClick, handleFulfillRequest, handleExpungeProduct, handleVerifyProduct, handleExpungeRequest, handleVerifyRequest, setFullscreenImg };
+  
   const [searchTerm, setSearchTerm] = useState('');
-
   const filterList = (list: any[]) => {
       return list.filter(item => {
           if (activeCampus !== 'All' && item.campus !== activeCampus) return false;
@@ -395,10 +429,7 @@ export default function Marketplace() {
           return true;
       });
   };
-
   let displayItems = viewMode === 'market' ? filterList(products) : filterList(requests);
-
-  // Sorting
   if (userLoc && activeCampus === 'All') {
       displayItems.sort((a, b) => {
           const cA = CAMPUSES.find(c => c.id === a.campus) || { lat: 0, lng: 0 };
@@ -407,128 +438,95 @@ export default function Marketplace() {
       });
   }
 
-  const itemHandlers = {
-      handleBuyClick,
-      handleFulfillRequest,
-      handleExpungeProduct,
-      handleVerifyProduct,
-      handleExpungeRequest,
-      handleVerifyRequest,
-      setFullscreenImg
-  };
-
-  // ============================================================================
-  // 🎨 ZONE 3: THE VISUAL LAYER (JSX/HTML)
-  // ============================================================================
   return (
     <div className="min-h-screen pb-32 transition-colors duration-300">
-        <div className="ticker-container">
-            <div className="ticker-content">
-                <span id="adText" className="text-[var(--wa-neon)] font-black text-[10px] uppercase tracking-widest">{tickerMsg}</span>
-            </div>
-        </div>
-
+        <div className="ticker-container"><div className="ticker-content"><span className="text-[var(--wa-neon)] font-black text-[10px] uppercase tracking-widest">{tickerMsg}</span></div></div>
         <header className="sticky top-0 z-50 bg-[var(--wa-chat-bg)] border-b border-[var(--border)] pt-safe noselect shadow-sm backdrop-blur-md">
             <div className="px-5 py-4 flex justify-between items-center">
-                <div 
-                    ref={logoRef} 
-                    onMouseDown={handleLogoTouchStart} 
-                    onMouseUp={handleLogoTouchEnd} 
-                    onTouchStart={handleLogoTouchStart} 
-                    onTouchEnd={handleLogoTouchEnd} 
-                    className="cursor-pointer"
-                >
+                <div ref={logoRef} onMouseDown={handleLogoTouchStart} onMouseUp={handleLogoTouchEnd} onTouchStart={handleLogoTouchStart} onTouchEnd={handleLogoTouchEnd} className="cursor-pointer">
                     <h1 className="text-[17px] font-extrabold tracking-tighter text-[var(--wa-teal)]">CAMPUS <span className="opacity-30">MARKETPLACE</span></h1>
                     {isAdmin && <span className="text-[8px] text-yellow-500 font-black uppercase bg-yellow-100 px-1 rounded ml-1">Sovereign Active</span>}
                 </div>
                 <div className="flex gap-3">
-                    <button onClick={toggleTheme} className="w-10 h-10 flex items-center justify-center rounded-2xl bg-[var(--surface)] shadow-sm tap">
-                        {darkMode ? '☀️' : '🌙'}
-                    </button>
-                    {isAdmin ? (
-                        <button onClick={() => setShowAdminPanel(true)} className="bg-black text-white px-5 py-2.5 rounded-2xl text-[10px] font-black shadow-lg tap">COMMAND</button>
-                    ) : (
-                        <button onClick={() => setShowProModal(true)} className="bg-[var(--wa-teal)] text-white px-5 py-2.5 rounded-2xl text-[10px] font-black shadow-lg tap">PRO</button>
-                    )}
+                    <button onClick={toggleTheme} className="w-10 h-10 flex items-center justify-center rounded-2xl bg-[var(--surface)] shadow-sm tap">{darkMode ? '☀️' : '🌙'}</button>
+                    {isAdmin && <button onClick={() => setShowAdminPanel(true)} className="bg-black text-white px-5 py-2.5 rounded-2xl text-[10px] font-black shadow-lg tap">COMMAND</button>}
+                    {!isAdmin && <button onClick={handleSellFastClick} className={`px-5 py-2.5 rounded-2xl text-[10px] font-black shadow-lg tap ${isProUser ? 'bg-yellow-500 text-black' : 'bg-[var(--wa-teal)] text-white'}`}>{isProUser ? '⚡ SELL FAST' : '💎 GO PRO'}</button>}
                 </div>
             </div>
-
-            <div className="px-5 pb-2 flex gap-2">
-                <button onClick={() => setViewMode('market')} className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'market' ? 'bg-[var(--wa-teal)] text-white shadow-lg' : 'bg-[var(--surface)] text-gray-400'}`}>Items For Sale</button>
-                <button onClick={() => setViewMode('requests')} className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'requests' ? 'bg-[#8E44AD] text-white shadow-lg' : 'bg-[var(--surface)] text-gray-400'}`}>Request Board</button>
+             <div className="px-5 pb-2 flex gap-2">
+                <button onClick={() => setViewMode('market')} className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'market' ? 'bg-[var(--wa-teal)] text-white shadow-lg' : 'bg-[var(--surface)] text-gray-400'}`}>Market</button>
+                <button onClick={() => setViewMode('requests')} className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition tap ${viewMode === 'requests' ? 'bg-[#8E44AD] text-white shadow-lg' : 'bg-[var(--surface)] text-gray-400'}`}>Requests</button>
             </div>
-
              <div className="px-5 pb-3 flex gap-3 overflow-x-auto scrollbar-hide pt-2 no-scrollbar">
-                {CAMPUSES.map(c => (
-                    <button key={c.id} onClick={() => setActiveCampus(c.id)} className={`flex-none px-5 py-2 rounded-full text-[10px] font-black border transition tap ${activeCampus === c.id ? 'bg-[var(--wa-teal)] text-white border-transparent' : 'border-gray-200 text-gray-400'}`}>
-                        {c.name}
-                    </button>
-                ))}
+                {CAMPUSES.map(c => <button key={c.id} onClick={() => setActiveCampus(c.id)} className={`flex-none px-5 py-2 rounded-full text-[10px] font-black border transition tap ${activeCampus === c.id ? 'bg-[var(--wa-teal)] text-white border-transparent' : 'border-gray-200 text-gray-400'}`}>{c.name}</button>)}
             </div>
-            
-            <div className="px-5 py-3">
-                <div className="search-container">
-                    <span className="opacity-20 text-sm mr-3">🔍</span>
-                    <input className="flex-1 bg-transparent py-3 text-[13px] font-semibold outline-none wa-input" placeholder={viewMode === 'market' ? "Search items..." : "Search requests..."} onChange={(e) => setSearchTerm(e.target.value)} />
-                </div>
-            </div>
+            <div className="px-5 py-3"><div className="search-container"><span className="opacity-20 text-sm mr-3">🔍</span><input className="flex-1 bg-transparent py-3 text-[13px] font-semibold outline-none wa-input" placeholder="Search..." onChange={(e) => setSearchTerm(e.target.value)} /></div></div>
         </header>
 
-        <main id="feed" className="grid grid-cols-2 gap-3 px-4 pb-20">
+        <main className="grid grid-cols-2 gap-3 px-4 pb-20">
             {loading ? <p className="col-span-2 text-center py-10 opacity-40">Loading...</p> : 
-             displayItems.length === 0 ? <p className="col-span-2 text-center py-10 opacity-40 text-sm font-bold">No items found here yet.</p> :
-             displayItems.map(item => (
-                 <ProductCard 
-                    key={item.id} 
-                    item={item} 
-                    viewMode={viewMode}
-                    isAdmin={isAdmin}
-                    userLoc={userLoc}
-                    campuses={CAMPUSES}
-                    handlers={itemHandlers}
-                 />
-            ))}
+             displayItems.map(item => <ProductCard key={item.id} item={item} viewMode={viewMode} isAdmin={isAdmin} userLoc={userLoc} campuses={CAMPUSES} handlers={itemHandlers} />)}
         </main>
-
+        
         <button onClick={() => setShowModal(true)} className="fixed bottom-8 right-6 fab z-50 tap">+</button>
 
-        {/* ... MODALS ... */}
         {showModal && (
             <div className="fixed inset-0 bg-black/60 z-[100] flex items-end backdrop-blur-sm">
                 <div className="glass-3d w-full p-6 rounded-t-[32px] animate-slide-up max-h-[85vh] overflow-y-auto no-bounce">
-                    <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-2xl">
-                        <button onClick={() => setPostType('sell')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition ${postType === 'sell' ? 'bg-white text-[var(--wa-teal)] shadow-sm' : 'text-gray-400'}`}>I want to Sell</button>
-                        <button onClick={() => setPostType('request')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition ${postType === 'request' ? 'bg-white text-[#8E44AD] shadow-sm' : 'text-gray-400'}`}>I want to Buy</button>
-                    </div>
                     <form onSubmit={handlePost} className="space-y-4">
                         <div className="grid grid-cols-2 gap-3">
-                             <select className="wa-input" value={form.campus} onChange={e => setForm({...form, campus: e.target.value})}>
-                                {CAMPUSES.filter(c => c.id !== 'All').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
-                            {postType === 'sell' && (
-                                <select className="wa-input" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
-                                    <option value="Physical">📦 Physical</option>
-                                    <option value="Digital">⚡ Digital</option>
-                                </select>
-                            )}
+                             <select className="wa-input" value={form.campus} onChange={e => setForm({...form, campus: e.target.value})}>{CAMPUSES.filter(c => c.id !== 'All').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+                             {postType === 'sell' && <select className="wa-input" value={form.type} onChange={e => setForm({...form, type: e.target.value})}><option value="Physical">📦 Physical</option><option value="Digital">⚡ Digital</option></select>}
                         </div>
-                        <input className="wa-input" placeholder={postType === 'sell' ? "What are you selling?" : "What do you need?"} value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
-                        <input className="wa-input" type="number" placeholder={postType === 'sell' ? "Price (₦)" : "Your Budget (₦)"} value={form.price} onChange={e => setForm({...form, price: e.target.value})} required />
-                        <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center relative tap">
-                            <input type="file" accept="image/*" multiple onChange={handleImageSelect} className="absolute inset-0 opacity-0 w-full h-full" />
-                            {previewUrls.length > 0 ? (
-                                <div className="flex gap-2 justify-center overflow-x-auto no-scrollbar">
-                                    {previewUrls.map((url, i) => <img key={i} src={url} className="h-16 w-16 rounded-lg object-cover shadow-sm" />)}
-                                </div>
-                            ) : (
-                                <p className="text-[9px] font-black text-gray-400 uppercase">{postType === 'sell' ? "Tap to Snap (Max 3)" : "Optional Reference Photo"}</p>
-                            )}
-                        </div>
+                        <input className="wa-input" placeholder="Title" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
+                        <input className="wa-input" type="number" placeholder="Price" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required />
+                        <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center relative tap"><input type="file" accept="image/*" multiple onChange={handleImageSelect} className="absolute inset-0 opacity-0 w-full h-full" /><p className="text-[9px] font-black text-gray-400 uppercase">Photos</p></div>
                         <input className="wa-input" type="tel" placeholder="WhatsApp (234...)" value={form.whatsapp} onChange={e => setForm({...form, whatsapp: e.target.value})} required />
-                        <button disabled={submitting} className={`w-full text-white py-4 rounded-2xl font-black shadow-xl text-lg uppercase tracking-widest tap ${postType === 'sell' ? 'bg-[var(--wa-teal)]' : 'bg-[#8E44AD]'} btn-active`}>
-                            {uploadStatus || (postType === 'sell' ? "Launch Ad" : "Post Request")}
-                        </button>
+                        <button disabled={submitting} className={`w-full text-white py-4 rounded-2xl font-black shadow-xl text-lg uppercase tracking-widest tap btn-active bg-[var(--wa-teal)]`}>{uploadStatus || "POST"}</button>
                         <button type="button" onClick={() => setShowModal(false)} className="w-full py-3 text-xs font-bold text-gray-400">CANCEL</button>
+                    </form>
+                </div>
+            </div>
+        )}
+
+        {showCodeInput && (
+            <div className="fixed inset-0 z-[140] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-fade-in">
+                <div className="glass-3d w-full max-w-sm p-8 text-center relative">
+                    <button onClick={() => setShowCodeInput(false)} className="absolute top-4 right-4 text-2xl opacity-50 tap">×</button>
+                    <div className="text-5xl mb-4">🔐</div>
+                    <h2 className="text-xl font-black uppercase text-[var(--wa-teal)] mb-2">Pro Access</h2>
+                    <p className="text-xs font-bold text-gray-400 mb-6">Enter the code from Admin to unlock Fast Selling</p>
+                    <form onSubmit={handleVerifyCode} className="space-y-4">
+                        <input className="wa-input text-center tracking-widest font-mono text-xl" placeholder="PRO-XXXXXX" value={accessCode} onChange={e => setAccessCode(e.target.value)} required />
+                        <button className="w-full bg-[var(--wa-teal)] text-white py-3 rounded-xl font-black uppercase tap btn-active">Unlock</button>
+                    </form>
+                    <a href={ADMIN_CONTACT} target="_blank" className="block mt-4 text-[10px] font-bold text-blue-500">Get Code from Admin</a>
+                </div>
+            </div>
+        )}
+
+        {showKYCForm && (
+            <div className="fixed inset-0 bg-black/60 z-[100] flex items-end backdrop-blur-sm">
+                <div className="glass-3d w-full p-6 rounded-t-[32px] animate-slide-up max-h-[90vh] overflow-y-auto no-bounce">
+                    <h2 className="text-xl font-black uppercase text-center mb-1 text-[var(--wa-teal)]">Identity Verification</h2>
+                    <p className="text-xs text-center text-gray-400 mb-6 font-bold">This data acts as insurance. Integrity is mandatory.</p>
+                    <form onSubmit={handleKYCSubmit} className="space-y-3">
+                        <input className="wa-input" placeholder="Full Name" value={kycForm.fullName} onChange={e => setKycForm({...kycForm, fullName: e.target.value})} required />
+                        <div className="grid grid-cols-2 gap-2">
+                             <input className="wa-input" placeholder="School" value={kycForm.school} onChange={e => setKycForm({...kycForm, school: e.target.value})} required />
+                             <input className="wa-input" placeholder="Level" value={kycForm.level} onChange={e => setKycForm({...kycForm, level: e.target.value})} required />
+                        </div>
+                        <input className="wa-input" placeholder="Department" value={kycForm.dept} onChange={e => setKycForm({...kycForm, dept: e.target.value})} required />
+                        <input className="wa-input" placeholder="Home Address (Lagos)" value={kycForm.address} onChange={e => setKycForm({...kycForm, address: e.target.value})} required />
+                        <input className="wa-input" placeholder="Your WhatsApp" value={kycForm.phone} onChange={e => setKycForm({...kycForm, phone: e.target.value})} required />
+                        <div className="bg-gray-100 p-3 rounded-xl">
+                            <p className="text-[10px] font-black uppercase text-gray-500 mb-2">Guarantor Info</p>
+                            <input className="wa-input mb-2" placeholder="Guarantor Name" value={kycForm.gName} onChange={e => setKycForm({...kycForm, gName: e.target.value})} required />
+                            <input className="wa-input" placeholder="Guarantor Phone" value={kycForm.gPhone} onChange={e => setKycForm({...kycForm, gPhone: e.target.value})} required />
+                        </div>
+                        <button disabled={submitting} className="w-full bg-black text-white py-4 rounded-2xl font-black shadow-xl uppercase tap btn-active">
+                             {submitting ? 'Verifying...' : 'Submit & Activate Pro'}
+                        </button>
                     </form>
                 </div>
             </div>
@@ -537,59 +535,38 @@ export default function Marketplace() {
         {showAdminPanel && (
             <div className="fixed inset-0 z-[200] bg-white dark:bg-black overflow-y-auto">
                 <div className="p-6">
-                    <div className="flex justify-between items-center mb-8">
-                        <h2 className="text-xl font-black uppercase text-[var(--wa-teal)]">Command Center</h2>
-                        <button onClick={() => setShowAdminPanel(false)} className="text-xs font-bold opacity-50 bg-gray-100 px-3 py-1 rounded-lg">CLOSE</button>
-                    </div>
-                    <div className="space-y-8">
-                        <div className="bg-blue-50 dark:bg-blue-900/20 p-5 rounded-3xl border border-blue-100 dark:border-blue-900">
-                             <h3 className="text-xs font-black uppercase text-blue-500 mb-2">SYSTEM QUANT STATUS</h3>
-                             {systemReport ? (
-                                 <div className="text-[10px] font-mono text-blue-800 dark:text-blue-300">
-                                     <p>STATUS: {systemReport.status}</p>
-                                     <p>PRODUCTS PURGED: {systemReport.products_purged}</p>
-                                     <p>REQUESTS PURGED: {systemReport.requests_purged}</p>
-                                 </div>
-                             ) : (
-                                 <button onClick={runSystemCleanup} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase w-full">RUN SYSTEM CLEANUP</button>
-                             )}
-                        </div>
-                        <div className="bg-gray-50 dark:bg-gray-900 p-5 rounded-3xl">
-                            <h3 className="text-xs font-black uppercase text-gray-400 mb-4">📢 Active Broadcasts</h3>
-                            <div className="space-y-3 mb-4">
-                                {broadcasts.map(b => (
-                                    <div key={b.id} className="flex items-center justify-between bg-white dark:bg-black p-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
-                                        <span className={`text-xs font-bold ${!b.is_active && 'opacity-30 line-through'}`}>{b.message}</span>
-                                        <div className="flex items-center gap-2">
-                                            <button onClick={() => toggleBroadcast(b.id, b.is_active)} className="text-xl tap">{b.is_active ? '👁️' : '🚫'}</button>
-                                            <button onClick={() => deleteBroadcast(b.id)} className="text-xl opacity-30 hover:opacity-100 tap">🗑️</button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            <form onSubmit={handleAddBroadcast} className="flex gap-2">
-                                <input name="message" className="wa-input" placeholder="New Alert..." required />
-                                <button className="bg-black text-white px-4 rounded-xl font-bold text-xs">ADD</button>
-                            </form>
-                        </div>
-                        <button onClick={handleLogout} className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase">End Sovereign Session</button>
+                    <div className="flex justify-between items-center mb-8"><h2 className="text-xl font-black uppercase text-[var(--wa-teal)]">Sovereign Admin</h2><button onClick={() => setShowAdminPanel(false)} className="text-xs font-bold bg-gray-100 px-3 py-1 rounded-lg">CLOSE</button></div>
+                    <div className="space-y-6">
+                         <div className="bg-yellow-50 p-5 rounded-3xl border border-yellow-200">
+                             <h3 className="text-xs font-black uppercase text-yellow-600 mb-2">Code Generator</h3>
+                             <div className="flex gap-2">
+                                 <div className="flex-1 bg-white p-3 rounded-xl font-mono text-center font-bold text-xl tracking-widest select-all">{generatedCode || '----'}</div>
+                                 <button onClick={handleGenerateCode} className="bg-black text-white px-4 rounded-xl font-black text-xs">GENERATE</button>
+                             </div>
+                         </div>
+                         <div className="bg-gray-50 p-5 rounded-3xl border border-gray-100">
+                             <h3 className="text-xs font-black uppercase text-gray-500 mb-4">💎 Verified Users ({verifiedUsers.length})</h3>
+                             <div className="space-y-2 max-h-60 overflow-y-auto">
+                                 {verifiedUsers.map(user => (
+                                     <div key={user.id} className="bg-white p-3 rounded-xl shadow-sm flex justify-between items-center">
+                                         <div>
+                                             <p className="text-[10px] font-bold">{user.full_name}</p>
+                                             <p className="text-[8px] text-gray-400">{user.user_phone}</p>
+                                         </div>
+                                         <button onClick={() => toggleUserStatus(user.id, user.is_active)} className={`text-[8px] font-black px-2 py-1 rounded ${user.is_active ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                                             {user.is_active ? 'ACTIVE' : 'REVOKED'}
+                                         </button>
+                                     </div>
+                                 ))}
+                             </div>
+                         </div>
+                         <button onClick={runSystemCleanup} className="w-full bg-blue-600 text-white py-3 rounded-2xl font-black uppercase text-xs">RUN SYSTEM CLEANUP</button>
+                         <button onClick={handleLogout} className="w-full bg-red-600 text-white py-3 rounded-2xl font-black uppercase text-xs">LOGOUT</button>
                     </div>
                 </div>
             </div>
         )}
         
-        {showProModal && (
-            <div className="fixed inset-0 z-[140] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-fade-in">
-                <div className="glass-3d w-full max-w-sm p-8 text-center relative">
-                    <button onClick={() => setShowProModal(false)} className="absolute top-4 right-4 text-2xl opacity-50 tap">×</button>
-                    <div className="text-5xl mb-4">💎</div>
-                    <h2 className="text-2xl font-black uppercase text-[var(--wa-teal)] mb-2">Campus Pro</h2>
-                    <p className="text-xs font-bold text-gray-400 mb-6">Upgrade your selling power</p>
-                    <a href={PRO_LINK} target="_blank" className="block w-full bg-[var(--wa-teal)] text-white py-4 rounded-2xl font-black shadow-xl uppercase tap btn-active">Message Admin to Join</a>
-                </div>
-            </div>
-        )}
-
         {showLogin && (
             <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl">
                  <div className="glass-3d w-full max-w-sm p-8 border-t-4 border-[var(--wa-teal)]">
@@ -604,12 +581,7 @@ export default function Marketplace() {
             </div>
         )}
 
-        {fullscreenImg && (
-            <div className="fixed inset-0 z-[300] bg-black flex items-center justify-center animate-fade-in">
-                <button onClick={() => setFullscreenImg(null)} className="absolute top-5 right-5 text-white text-3xl font-bold bg-white/10 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md z-50 tap">×</button>
-                <img src={fullscreenImg} className="max-w-screen max-h-screen object-contain" />
-            </div>
-        )}
+        {fullscreenImg && <div className="fixed inset-0 z-[300] bg-black flex items-center justify-center animate-fade-in"><button onClick={() => setFullscreenImg(null)} className="absolute top-5 right-5 text-white text-3xl font-bold bg-white/10 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md z-50 tap">×</button><img src={fullscreenImg} className="max-w-screen max-h-screen object-contain" /></div>}
     </div>
   );
 }
