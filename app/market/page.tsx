@@ -2,10 +2,16 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
+// @ts-ignore
 import confetti from 'canvas-confetti';
 import ProductCard from './ProductCard';
 
-// --- CONFIGURATION ---
+// ============================================================================
+// 🛠️ ZONE 1: THE OVERRIDE COCKPIT (EDIT HERE SAFELY)
+// ============================================================================
+
+// 1. CAMPUS LIST (Add/Remove Schools here)
+//    Format: { id: 'SHORTCODE', name: 'Display Name', lat: Latitude, lng: Longitude }
 const CAMPUSES = [
   { id: 'All', name: 'All Campuses', lat: 0, lng: 0 },
   { id: 'UNILAG', name: 'UNILAG', lat: 6.5157, lng: 3.3899 },
@@ -14,7 +20,7 @@ const CAMPUSES = [
   { id: 'TASUED', name: 'TASUED', lat: 6.7967, lng: 3.9275 },
   { id: 'OOU', name: 'OOU (Ago-Iwoye)', lat: 6.9427, lng: 3.9175 },
   { id: 'UNIPORT', name: 'UNIPORT', lat: 4.9069, lng: 6.9170 },
-  { id: 'UNIDEL', name: 'UNIDEL', lat: 6.2536, lng: 6.1978 },
+  { id: 'UNIDEL', name: 'UNIDEL (Agbor)', lat: 6.2536, lng: 6.1978 },
   { id: 'UNIBEN', name: 'UNIBEN', lat: 6.3350, lng: 5.6037 },
   { id: 'UI', name: 'UI (Ibadan)', lat: 7.4443, lng: 3.9008 },
   { id: 'OAU', name: 'OAU (Ife)', lat: 7.5180, lng: 4.5276 },
@@ -25,6 +31,24 @@ const CAMPUSES = [
   { id: 'UNN', name: 'UNN', lat: 6.8643, lng: 7.4082 },
   { id: 'ABU', name: 'ABU Zaria', lat: 11.1517, lng: 7.6492 }
 ];
+
+// 2. SYSTEM SETTINGS
+const CONFIG = {
+    DEFAULT_TICKER: "CAMPUS MARKETPLACE • BUY & SELL SAFELY", // Fallback if no broadcasts
+    MAX_IMAGES: 3,                 // Max photos per post
+    DAILY_POST_LIMIT: 3,           // Non-admin posts per day
+    COMPRESSION_QUALITY: 0.8,      // Image quality (0.1 to 1.0)
+    HOLD_TO_LOGIN_MS: 2000,        // How long to hold logo for admin login (ms)
+    ANIMATION_SPEED: 150,          // Confetti particle count
+    PHONE_PREFIX: '234'            // Nigeria Country Code
+};
+
+// 3. ADMIN PRO LINKS
+const PRO_LINK = "https://wa.me/2347068516779?text=I%20want%20to%20upgrade%20to%20Campus%20PRO";
+
+// ============================================================================
+// ⚠️ ZONE 2: THE LOGIC CORE (DO NOT EDIT UNLESS YOU KNOW CODE)
+// ============================================================================
 
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     if (!lat1 || !lat2) return 0;
@@ -53,7 +77,7 @@ const compressImage = async (file: File): Promise<Blob> => {
                 canvas.width = maxWidth;
                 canvas.height = img.height * scale;
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                canvas.toBlob((blob) => { if(blob) resolve(blob) }, 'image/jpeg', 0.8);
+                canvas.toBlob((blob) => { if(blob) resolve(blob) }, 'image/jpeg', CONFIG.COMPRESSION_QUALITY);
             };
         };
     });
@@ -141,7 +165,7 @@ export default function Marketplace() {
       if(data) {
           setBroadcasts(data);
           const activeMsgs = data.filter((b: any) => b.is_active).map((b: any) => b.message).join(' • ');
-          setTickerMsg(activeMsgs || "CAMPUS MARKETPLACE");
+          setTickerMsg(activeMsgs || CONFIG.DEFAULT_TICKER);
       }
   }
 
@@ -199,7 +223,7 @@ export default function Marketplace() {
       holdTimer.current = setTimeout(() => {
           if (navigator.vibrate) navigator.vibrate(200);
           setShowLogin(true);
-      }, 2000);
+      }, CONFIG.HOLD_TO_LOGIN_MS);
   };
   const handleLogoTouchEnd = () => {
       if(holdTimer.current) clearTimeout(holdTimer.current);
@@ -261,10 +285,10 @@ export default function Marketplace() {
 
     const sanitizePhone = (input: string) => {
         let clean = input.replace(/\D/g, ''); 
-        if (clean.startsWith('2340')) clean = '234' + clean.substring(4);
-        if (clean.length === 11 && clean.startsWith('0')) clean = '234' + clean.substring(1);
-        if (clean.length === 10 && (clean.startsWith('8') || clean.startsWith('7') || clean.startsWith('9'))) clean = '234' + clean;
-        if (clean.length !== 13 || !clean.startsWith('234')) throw new Error(`Invalid Phone Number. Use format: 08012345678`);
+        if (clean.startsWith('2340')) clean = CONFIG.PHONE_PREFIX + clean.substring(4);
+        if (clean.length === 11 && clean.startsWith('0')) clean = CONFIG.PHONE_PREFIX + clean.substring(1);
+        if (clean.length === 10 && (clean.startsWith('8') || clean.startsWith('7') || clean.startsWith('9'))) clean = CONFIG.PHONE_PREFIX + clean;
+        if (clean.length !== 13 || !clean.startsWith(CONFIG.PHONE_PREFIX)) throw new Error(`Invalid Phone Number. Use format: 08012345678`);
         return clean;
     };
     
@@ -280,6 +304,17 @@ export default function Marketplace() {
 
         const { data: banned } = await supabase.from('blacklist').select('ip_address').eq('ip_address', clientIp).maybeSingle();
         if(banned) { alert("Connection Refused."); setSubmitting(false); return; }
+        
+        // CHECK QUOTA
+        if (!isAdmin) {
+            const today = new Date().toLocaleDateString();
+            const quota = JSON.parse(localStorage.getItem('post_quota') || '{}');
+            if (quota.date === today && quota.count >= CONFIG.DAILY_POST_LIMIT) {
+                alert(`Daily Limit of ${CONFIG.DAILY_POST_LIMIT} posts reached!`); 
+                setSubmitting(false); 
+                return;
+            }
+        }
 
         let finalImageUrls = [];
         if (imageFiles.length > 0) {
@@ -319,7 +354,13 @@ export default function Marketplace() {
             if (error) throw error;
         }
 
-        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+        // UPDATE QUOTA
+        const today = new Date().toLocaleDateString();
+        const currentQuota = JSON.parse(localStorage.getItem('post_quota') || '{}');
+        const newCount = (currentQuota.date === today ? currentQuota.count : 0) + 1;
+        localStorage.setItem('post_quota', JSON.stringify({ date: today, count: newCount }));
+
+        confetti({ particleCount: CONFIG.ANIMATION_SPEED, spread: 70, origin: { y: 0.6 } });
         setShowModal(false);
         setForm({ title: '', price: '', whatsapp: '', campus: 'UNILAG', type: 'Physical' });
         setImageFiles([]);
@@ -336,7 +377,7 @@ export default function Marketplace() {
   };
 
   const handleImageSelect = (e: any) => {
-      const files = Array.from(e.target.files).slice(0, 3) as File[];
+      const files = Array.from(e.target.files).slice(0, CONFIG.MAX_IMAGES) as File[];
       if (files.length > 0) {
           setImageFiles(files);
           setPreviewUrls(files.map(file => URL.createObjectURL(file)));
@@ -376,6 +417,9 @@ export default function Marketplace() {
       setFullscreenImg
   };
 
+  // ============================================================================
+  // 🎨 ZONE 3: THE VISUAL LAYER (JSX/HTML)
+  // ============================================================================
   return (
     <div className="min-h-screen pb-32 transition-colors duration-300">
         <div className="ticker-container">
@@ -541,7 +585,7 @@ export default function Marketplace() {
                     <div className="text-5xl mb-4">💎</div>
                     <h2 className="text-2xl font-black uppercase text-[var(--wa-teal)] mb-2">Campus Pro</h2>
                     <p className="text-xs font-bold text-gray-400 mb-6">Upgrade your selling power</p>
-                    <a href="https://wa.me/2347068516779?text=I%20want%20to%20upgrade%20to%20Campus%20PRO" target="_blank" className="block w-full bg-[var(--wa-teal)] text-white py-4 rounded-2xl font-black shadow-xl uppercase tap btn-active">Message Admin to Join</a>
+                    <a href={PRO_LINK} target="_blank" className="block w-full bg-[var(--wa-teal)] text-white py-4 rounded-2xl font-black shadow-xl uppercase tap btn-active">Message Admin to Join</a>
                 </div>
             </div>
         )}
