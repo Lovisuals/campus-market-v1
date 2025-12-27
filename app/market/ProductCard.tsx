@@ -2,9 +2,19 @@
 
 import { useMemo } from 'react';
 
-export default function ProductCard({ item, viewMode, isAdmin, userLoc, campuses, handlers }: any) {
+// --- THE FIX: Define the expected props ---
+interface ProductCardProps {
+  item: any;
+  viewMode: string;
+  isAdmin: boolean;
+  userLoc: { lat: number; lng: number } | null;
+  campuses: any[];
+  handlers: any;
+}
+
+export default function ProductCard({ item, viewMode, isAdmin, userLoc, campuses, handlers }: ProductCardProps) {
   
-  // 1. Image Parsing (Handles legacy JSON strings vs Arrays)
+  // 1. Image Parsing
   const images = useMemo(() => {
     if (Array.isArray(item.images)) return item.images;
     try {
@@ -13,7 +23,7 @@ export default function ProductCard({ item, viewMode, isAdmin, userLoc, campuses
     return [item.image_url || "https://placehold.co/600x600/008069/white?text=No+Image"];
   }, [item]);
 
-  // 2. Distance Calculation Logic
+  // 2. Distance Calculation
   const distance = useMemo(() => {
     if (!userLoc || !item.campus) return null;
     const campusData = campuses.find((c: any) => c.id === item.campus);
