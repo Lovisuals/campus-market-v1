@@ -1,13 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Explicitly tell Next.js where the app lives
+  distDir: '.next',
+  // Ensure the server doesn't try to "static export" the API
   output: 'standalone',
-  // This unique ID forces Vercel to treat this as a fresh build
-  generateBuildId: async () => `build-${Date.now()}`,
-  images: {
-    remotePatterns: [{ protocol: 'https', hostname: 'res.cloudinary.com', pathname: '**' }],
-  },
-  typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
+  // Force clean build
+  generateBuildId: async () => 'build-final-v1'
 };
 
 module.exports = nextConfig;
