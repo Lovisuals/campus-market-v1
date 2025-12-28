@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { generateMagicToken } from '../../../src/lib/jwt';
+// Use the @ alias to find the lib regardless of folder depth
+import { generateMagicToken } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 0; // Disable caching for this route
+export const revalidate = 0;
 
 export async function POST(request) {
   try {
@@ -16,5 +17,5 @@ export async function POST(request) {
 }
 
 export async function GET() {
-  return NextResponse.json({ status: "Route Refreshed", time: Date.now() });
+  return NextResponse.json({ status: "Route Active", timestamp: Date.now() });
 }
