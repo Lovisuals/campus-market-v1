@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-// Use the @ alias to find the lib regardless of folder depth
+// Use @ to point to the src directory automatically
 import { generateMagicToken } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 export async function POST(request) {
   try {
@@ -17,5 +16,5 @@ export async function POST(request) {
 }
 
 export async function GET() {
-  return NextResponse.json({ status: "Route Active", timestamp: Date.now() });
+  return NextResponse.json({ status: "API is active", alias: "working" });
 }
