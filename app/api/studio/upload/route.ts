@@ -51,7 +51,7 @@ export async function POST(request: Request) {
 
     const supabase = createClient(cookies());
     const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 6);
+    expiresAt.setHours(expiresAt.getHours() + 6); 
 
     let { data: contributor } = await supabase.from('contributors').select('id').eq('phone', user.phone).single();
     if (!contributor) {
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
         expires_at: expiresAt.toISOString()
     }]);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, url: uploadResult.secure_url });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
