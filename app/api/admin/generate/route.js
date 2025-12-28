@@ -9,7 +9,7 @@ export async function POST(request) {
     const { phone, school } = body;
 
     if (!phone || !school) {
-      return NextResponse.json({ error: 'Missing Data' }, { status: 400 });
+      return NextResponse.json({ error: 'Data Missing' }, { status: 400 });
     }
 
     const token = await generateMagicToken(phone, school);
@@ -20,6 +20,7 @@ export async function POST(request) {
       token 
     });
   } catch (error) {
-    return NextResponse.json({ error: 'Server Error' }, { status: 500 });
+    console.error('Next16_API_Error:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
