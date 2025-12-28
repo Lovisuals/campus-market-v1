@@ -1,30 +1,20 @@
 import { NextResponse } from 'next/server';
 import { generateMagicToken } from '../../../src/lib/jwt';
 
-// FORCE dynamic mode to prevent static HTML generation
 export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
+export const revalidate = 0; // Disable caching for this route
 
-async function handle(request) {
+export async function POST(request) {
   try {
-    // If it's just a browser check (GET)
-    if (request.method === 'GET') {
-      return NextResponse.json({ status: "API Route is Active" });
-    }
-
-    // If it's our actual data request (POST)
     const body = await request.json();
     const token = await generateMagicToken(body.phone, body.school || 'UNILAG');
     const origin = new URL(request.url).origin;
-    
-    return NextResponse.json({ 
-      success: true, 
-      link: `${origin}/studio?key=${token}` 
-    });
+    return NextResponse.json({ success: true, link: `${origin}/studio?key=${token}` });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// Export the same function for both methods to stop 405s
-export { handle as GET, handle as POST };
+export async function GET() {
+  return NextResponse.json({ status: "Route Refreshed", time: Date.now() });
+}
