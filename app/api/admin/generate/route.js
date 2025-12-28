@@ -3,30 +3,28 @@ import { generateMagicToken } from '../../../src/lib/jwt';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request) {
-  console.log("DEBUG: Request received");
+async function handle(request) {
   try {
-    const body = await request.json();
-    console.log("DEBUG: Body parsed", body);
+    // If it's a GET request, just show a status page
+    if (request.method === 'GET') {
+      return NextResponse.json({ status: "Endpoint is active. Use POST to generate." });
+    }
 
+    const body = await request.json();
     if (!body.phone) {
-       return NextResponse.json({ error: "No phone number provided" }, { status: 400 });
+      return NextResponse.json({ error: 'Phone missing' }, { status: 400 });
     }
 
     const token = await generateMagicToken(body.phone, body.school || 'UNILAG');
-    console.log("DEBUG: Token generated");
-
     const origin = new URL(request.url).origin;
+    
     return NextResponse.json({ 
       success: true, 
       link: `${origin}/studio?key=${token}` 
     });
   } catch (error) {
-    console.error("DEBUG: Crash caught", error.message);
-    return NextResponse.json({ 
-      error: "SERVER_CRASH", 
-      message: error.message,
-      stack: error.stack?.substring(0, 100) 
-    }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export { handle as GET, handle as POST };
