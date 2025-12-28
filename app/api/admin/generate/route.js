@@ -1,20 +1,19 @@
 import { NextResponse } from 'next/server';
 import { generateMagicToken } from '../../../src/lib/jwt';
 
+// FORCE dynamic mode to prevent static HTML generation
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 async function handle(request) {
   try {
-    // If it's a GET request, just show a status page
+    // If it's just a browser check (GET)
     if (request.method === 'GET') {
-      return NextResponse.json({ status: "Endpoint is active. Use POST to generate." });
+      return NextResponse.json({ status: "API Route is Active" });
     }
 
+    // If it's our actual data request (POST)
     const body = await request.json();
-    if (!body.phone) {
-      return NextResponse.json({ error: 'Phone missing' }, { status: 400 });
-    }
-
     const token = await generateMagicToken(body.phone, body.school || 'UNILAG');
     const origin = new URL(request.url).origin;
     
@@ -27,4 +26,5 @@ async function handle(request) {
   }
 }
 
+// Export the same function for both methods to stop 405s
 export { handle as GET, handle as POST };
