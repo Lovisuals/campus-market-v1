@@ -20,106 +20,127 @@ body.dark-mode {
   color: #e9edef;
 }
 
-/* --- 1. SOVEREIGN UI RESTORATION (Glass & Layout) --- */
-.glass-3d {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
-}
-.dark-mode .glass-3d {
-  background: rgba(17, 27, 33, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
+@layer components {
+  /* Sovereign Glassmorphism (Premium WA Feel) */
+  .glass-3d {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+    border-radius: 1.5rem;
+  }
+  .dark-mode .glass-3d {
+    background: rgba(17, 27, 33, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
 
-/* Animations */
-@keyframes slideUp {
-  from { transform: translateY(100%); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-.animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  /* WhatsApp-Accurate Input Fields */
+  .wa-input {
+    width: 100%;
+    padding: 12px 16px;
+    background: #f0f2f5;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    outline: none;
+    font-size: 15px;
+    transition: all 0.2s ease;
+    color: #111b21;
+  }
+  .dark-mode .wa-input {
+    background: #2a3942;
+    color: white;
+  }
+  .wa-input:focus {
+    background: white;
+    border-color: var(--wa-teal);
+    box-shadow: 0 0 0 2px rgba(0, 128, 105, 0.1);
+  }
+  .dark-mode .wa-input:focus {
+    background: #202c33;
+  }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-.animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
-
-/* Interactive Elements */
-.tap:active { transform: scale(0.95); transition: transform 0.1s; }
-.noselect { user-select: none; -webkit-user-select: none; }
-.pt-safe { padding-top: env(safe-area-inset-top); }
-
-/* WhatsApp Inputs */
-.wa-input {
-  width: 100%;
-  padding: 12px 16px;
-  background: #f0f2f5;
-  border-radius: 12px;
-  border: 1px solid transparent;
-  outline: none;
-  font-size: 15px;
-  transition: all 0.2s;
-  color: #111b21;
-}
-.dark-mode .wa-input {
-  background: #2a3942;
-  color: white;
-}
-.wa-input:focus { background: white; border-color: var(--wa-teal); box-shadow: 0 0 0 2px rgba(0, 128, 105, 0.1); }
-.dark-mode .wa-input:focus { background: #202c33; }
-
-/* Ticker */
-.ticker-container { overflow: hidden; white-space: nowrap; background: #000; padding: 4px 0; }
-.ticker-content { display: inline-block; animation: ticker 20s linear infinite; }
-@keyframes ticker { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }
-
-/* FAB */
-.fab {
-  width: 56px; height: 56px;
-  background: var(--wa-teal); color: white;
-  border-radius: 20px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 32px; font-weight: 300;
-  box-shadow: 0 4px 12px rgba(0, 128, 105, 0.4);
-  transition: all 0.2s;
+  /* Floating Action Button */
+  .fab {
+    width: 56px;
+    height: 56px;
+    background: var(--wa-teal);
+    color: white;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: 300;
+    box-shadow: 0 4px 12px rgba(0, 128, 105, 0.4);
+    transition: transform 0.2s ease;
+  }
+  .fab:active {
+    transform: scale(0.92);
+  }
 }
 
-/* --- 2. YOUR NEW ADDITIONS (Blended) --- */
+@layer utilities {
+  /* Stories Rail – Infinite Horizontal Snap Scroll */
+  .snap-x-mandatory {
+    scroll-snap-type: x mandatory;
+    overflow-x: auto;
+    display: flex;
+    -webkit-overflow-scrolling: touch;
+  }
+  .snap-center-item {
+    scroll-snap-align: center;
+    flex-shrink: 0;
+    width: 100%;
+  }
 
-/* The WhatsApp "Floating" Effect */
-.wa-shadow {
-  box-shadow: 0 1px 0.5px rgba(11,20,26,.08);
-}
-
-/* Better Button Press State */
-.btn-active:active {
-  transform: scale(0.95);
-  transition: transform 0.1s cubic-bezier(0, 0, 0.2, 1);
-}
-
-/* Smooth Container Scrolling (For Categories) */
-.no-scrollbar {
+  /* Scrollbar Concealment */
+  .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
-}
-.no-scrollbar::-webkit-scrollbar {
+  }
+  .scrollbar-hide::-webkit-scrollbar {
     display: none;
-}
+  }
 
-/* WhatsApp-style "Message Bubble" Gradient for accents */
-.wa-gradient {
-  background: linear-gradient(135deg, #25D366 0%, #075E54 100%);
-}
+  /* Mobile UX Polish */
+  .no-bounce { overscroll-behavior-y: contain; }
+  .tap:active { transform: scale(0.95); transition: transform 0.1s ease; }
+  .btn-active:active { transform: scale(0.95); transition: transform 0.1s ease; }
+  .noselect { user-select: none; -webkit-user-select: none; }
+  .pt-safe { padding-top: env(safe-area-inset-top); }
 
-/* Mobile Bottom Sheet Prevention */
-.no-bounce {
-  overscroll-behavior-y: contain;
-}
+  /* Verified Badge Pulse Ring (Green Breathing Effect) */
+  .verified-pulse {
+    animation: ring-pulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+  }
+  @keyframes ring-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.4); }
+    70%  { box-shadow: 0 0 0 10px rgba(37, 211, 102, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }
+  }
 
-/* High-Contrast Text for Price Tags */
-.price-tag {
-  font-feature-settings: "tnum"; 
-  letter-spacing: -0.02em;
+  /* Global Alert Ticker (Admin Broadcasts) */
+  .ticker-container {
+    overflow: hidden;
+    white-space: nowrap;
+    background: #000;
+    padding: 8px 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--wa-neon);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .ticker-content {
+    display: inline-block;
+    animation: ticker 25s linear infinite;
+  }
+  @keyframes ticker {
+    0%   { transform: translateX(100vw); }
+    100% { transform: translateX(-100%); }
+  }
+  .ticker-container:hover .ticker-content {
+    animation-play-state: paused;
+  }
 }
