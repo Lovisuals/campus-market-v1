@@ -345,7 +345,7 @@ export default function Marketplace() {
             }
         }
 
-        let finalImageUrls = [];
+        const finalImageUrls = [];
         if (imageFiles.length > 0) {
             setUploadStatus('Uploading...');
             for (let i = 0; i < imageFiles.length; i++) {
@@ -477,7 +477,7 @@ export default function Marketplace() {
           return true;
       });
   };
-  let displayItems = viewMode === 'market' ? filterList(products) : filterList(requests);
+  const displayItems = viewMode === 'market' ? filterList(products) : filterList(requests);
   if (userLoc && activeCampus === 'All') {
       displayItems.sort((a, b) => {
           const cA = CAMPUSES.find(c => c.id === a.campus) || { lat: 0, lng: 0 };
