@@ -34,14 +34,34 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
     }
   };
 
+  // 🔧 CORRECTED & ROBUST FETCH LOGIC
   const fetchStories = async () => {
+    setLoading(true);
+    
+    // 1. Fetch videos with LEFT JOIN (contributors may be null)
     const { data, error } = await supabase
       .from('videos')
-      .select('*, contributors(name, school, is_admin)')
-      .gt('expires_at', new Date().toISOString())
+      .select('*, contributors(name, is_admin, school)')
       .order('created_at', { ascending: false });
 
-    if (!error && data) setStories(data);
+    if (error) {
+      console.error("❌ SQL Error:", error.message);
+      setLoading(false);
+      return;
+    }
+
+    if (data) {
+      console.log("📡 Data Received:", data.length, "rows");
+      
+      // 2. Determine Elite status from TWO sources (redundant & resilient)
+      const processedStories = data.map(s => ({
+        ...s,
+        is_elite: s.is_admin === true || s.contributors?.is_admin === true
+      }));
+
+      setStories(processedStories);
+    }
+
     setLoading(false);
   };
 
@@ -67,11 +87,10 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
     }
   };
 
-  // 🔍 Filtering Logic
-  const adminStories = stories.filter(s => s.is_admin || s.contributors?.is_admin);
+  // 🔍 FILTERING LOGIC USING is_elite
+  const eliteStories = stories.filter(s => s.is_elite);
   const userStories = stories.filter(s => 
-    !s.is_admin && 
-    !s.contributors?.is_admin && 
+    !s.is_elite && 
     (activeCampus === 'All' || s.campus === activeCampus || s.contributors?.school === activeCampus)
   );
 
@@ -97,8 +116,8 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
       <div className="flex items-start px-5 gap-4 overflow-x-auto scrollbar-hide snap-x-mandatory">
         {/* 👑 SUPREME ADMIN PIN - ALWAYS VISIBLE */}
         <div className="flex-shrink-0 flex items-center gap-4 border-r border-[var(--border)] pr-4 min-w-[80px]">
-          {adminStories.length > 0 ? (
-            adminStories.map(story => (
+          {eliteStories.length > 0 ? (
+            eliteStories.map(story => (
               <StoryCircle 
                 key={story.id} 
                 story={story} 
@@ -107,7 +126,7 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
               />
             ))
           ) : (
-            /* 🌑 No Updates Placeholder - Keeps section persistent */
+            /* 🌑 No Updates Placeholder - Persistent Section */
             <div className="flex flex-col items-center gap-1 opacity-50 group cursor-default">
               <div className="w-14 h-14 rounded-full border-2 border-dashed border-yellow-600/40 flex items-center justify-center bg-yellow-500/10 backdrop-blur-sm">
                 <span className="text-2xl group-hover:scale-110 transition-transform">👑</span>
