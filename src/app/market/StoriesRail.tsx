@@ -10,7 +10,6 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   
-  // Admin Post States
   const [showPostModal, setShowPostModal] = useState(false);
   const [newVideo, setNewVideo] = useState({ url: '', caption: '', category: 'general' });
 
@@ -21,7 +20,7 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
     checkAdminStatus();
     
     const channel = supabase.channel('realtime_stories')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'videos' }, fetchStories)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'videos' }, () => fetchStories())
       .subscribe();
     
     return () => { supabase.removeChannel(channel); };
@@ -38,7 +37,7 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
   const fetchStories = async () => {
     const { data, error } = await supabase
       .from('videos')
-      .select('*, contributors!inner(name, school, is_admin, phone)')
+      .select('*, contributors(name, school, is_admin)')
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false });
 
@@ -48,7 +47,7 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
 
   const handleSovereignPost = async () => {
     if (!newVideo.url) return alert("Enter Cloudinary URL");
-    const phone = localStorage.getItem('user_phone');
+    const phone = localStorage.getItem('user_phone') || '2348083000771';
     
     const { error } = await supabase.from('videos').insert([{
       contributor_phone: phone,
@@ -56,7 +55,9 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
       thumbnail_url: newVideo.url.replace(/\.[^/.]+$/, ".jpg"),
       caption: newVideo.caption,
       category: newVideo.category,
-      expires_at: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString() // 6 Hour Expiry
+      is_admin: true,
+      campus: activeCampus === 'All' ? 'GLOBAL' : activeCampus,
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
     }]);
 
     if (!error) {
@@ -66,8 +67,13 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
     }
   };
 
-  const adminStories = stories.filter(s => s.contributors?.is_admin);
-  const userStories = stories.filter(s => !s.contributors?.is_admin && (activeCampus === 'All' || s.contributors?.school === activeCampus));
+  // 🔍 Filtering Logic
+  const adminStories = stories.filter(s => s.is_admin || s.contributors?.is_admin);
+  const userStories = stories.filter(s => 
+    !s.is_admin && 
+    !s.contributors?.is_admin && 
+    (activeCampus === 'All' || s.campus === activeCampus || s.contributors?.school === activeCampus)
+  );
 
   return (
     <div className="bg-[var(--wa-chat-bg)] border-b border-[var(--border)] pt-2 pb-4">
@@ -88,7 +94,9 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
           {adminStories.length > 0 ? adminStories.map(story => (
              <StoryCircle key={story.id} story={story} isAdmin onClick={() => setViewingStory(story)} />
           )) : (
-            <div className="w-16 flex flex-col items-center gap-1 opacity-20"><div className="w-14 h-14 rounded-full border-2 border-dashed border-gray-400 flex items-center justify-center text-xl">👑</div></div>
+            <div className="w-16 flex flex-col items-center gap-1 opacity-20">
+              <div className="w-14 h-14 rounded-full border-2 border-dashed border-gray-400 flex items-center justify-center text-xl">👑</div>
+            </div>
           )}
         </div>
 
@@ -115,16 +123,16 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
         <div className="fixed inset-0 z-[2000] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
           <div className="bg-[var(--surface)] w-full max-w-sm rounded-[32px] p-8 border border-[var(--border)] shadow-2xl animate-scale-up">
             <h2 className="text-lg font-black mb-6 flex items-center gap-2">👑 SUPREME UPLOAD</h2>
-            <input type="text" placeholder="Cloudinary Video URL" className="w-full bg-[var(--wa-chat-bg)] border border-[var(--border)] p-4 rounded-2xl text-xs mb-4 outline-none focus:border-yellow-500" onChange={(e) => setNewVideo({...newVideo, url: e.target.value})} />
-            <input type="text" placeholder="Caption..." className="w-full bg-[var(--wa-chat-bg)] border border-[var(--border)] p-4 rounded-2xl text-xs mb-6 outline-none" onChange={(e) => setNewVideo({...newVideo, caption: e.target.value})} />
+            <input type="text" placeholder="Cloudinary Video URL" className="w-full bg-[var(--wa-chat-bg)] border border-[var(--border)] p-4 rounded-2xl text-xs mb-4 outline-none focus:border-yellow-500 text-white" onChange={(e) => setNewVideo({...newVideo, url: e.target.value})} />
+            <input type="text" placeholder="Caption..." className="w-full bg-[var(--wa-chat-bg)] border border-[var(--border)] p-4 rounded-2xl text-xs mb-6 outline-none text-white" onChange={(e) => setNewVideo({...newVideo, caption: e.target.value})} />
             <div className="flex gap-2 mb-6">
               {['news', 'sos', 'market'].map(c => (
-                <button key={c} onClick={() => setNewVideo({...newVideo, category: c})} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase border ${newVideo.category === c ? 'bg-yellow-500 border-yellow-600' : 'opacity-40'}`}>{c}</button>
+                <button key={c} onClick={() => setNewVideo({...newVideo, category: c})} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase border transition-all ${newVideo.category === c ? 'bg-yellow-500 border-yellow-600 text-black' : 'opacity-40 text-white'}`}>{c}</button>
               ))}
             </div>
             <div className="flex gap-4">
-              <button onClick={() => setShowPostModal(false)} className="flex-1 text-xs font-bold opacity-50">Cancel</button>
-              <button onClick={handleSovereignPost} className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl text-xs font-black shadow-lg shadow-yellow-500/20">POST NOW</button>
+              <button onClick={() => setShowPostModal(false)} className="flex-1 text-xs font-bold opacity-50 text-white">Cancel</button>
+              <button onClick={handleSovereignPost} className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl text-xs font-black shadow-lg shadow-yellow-500/20 active:scale-95 transition-transform">POST NOW</button>
             </div>
           </div>
         </div>
@@ -136,14 +144,18 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
           <div className="absolute top-0 w-full h-1 bg-white/20 z-[1001]"><div className="h-full bg-white progress-bar" /></div>
           <div className="p-6 flex justify-between items-center text-white z-50 pt-10">
             <div className="flex items-center gap-3">
-              <img src={viewingStory.thumbnail_url} className="w-8 h-8 rounded-full border border-white" />
-              <p className="text-xs font-black">{viewingStory.contributors?.name}</p>
+              <img src={viewingStory.thumbnail_url} className="w-8 h-8 rounded-full border border-white object-cover" />
+              <p className="text-xs font-black">{viewingStory.contributors?.name || 'Sovereign Admin'}</p>
             </div>
-            <button onClick={() => setViewingStory(null)} className="text-4xl font-light">×</button>
+            <button onClick={() => setViewingStory(null)} className="text-4xl font-light leading-none">&times;</button>
           </div>
           <div className="flex-1 flex items-center justify-center relative">
-            <video autoPlay playsInline onEnded={() => setViewingStory(null)} className="w-full max-h-[85vh] object-contain" src={viewingStory.cloudinary_url + '?eo_15'} />
-            <div className="absolute bottom-10 px-8 text-center bg-black/60 py-3 rounded-2xl backdrop-blur-md mx-4"><p className="text-white text-sm font-bold">{viewingStory.caption}</p></div>
+            <video autoPlay playsInline onEnded={() => setViewingStory(null)} className="w-full max-h-[85vh] object-contain" src={viewingStory.cloudinary_url} />
+            <div className="absolute bottom-10 px-8 w-full">
+               <div className="bg-black/60 py-4 px-6 rounded-2xl backdrop-blur-md text-center">
+                 <p className="text-white text-sm font-bold leading-relaxed">{viewingStory.caption}</p>
+               </div>
+            </div>
           </div>
         </div>
       )}
@@ -154,12 +166,12 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
 function StoryCircle({ story, isAdmin, onClick }: any) {
   const isSOS = story.category === 'sos';
   return (
-    <div onClick={onClick} className="flex-shrink-0 w-16 flex flex-col items-center gap-1 tap snap-center">
+    <div onClick={onClick} className="flex-shrink-0 w-16 flex flex-col items-center gap-1 tap snap-center cursor-pointer">
       <div className={`w-14 h-14 rounded-full p-0.5 border-2 ${isAdmin ? 'border-yellow-500 bg-gradient-to-tr from-yellow-500 to-orange-400' : isSOS ? 'border-red-600 verified-pulse' : 'border-[var(--wa-teal)]'}`}>
-        <img src={story.thumbnail_url} className="w-full h-full rounded-full object-cover border-2 border-white dark:border-black" />
+        <img src={story.thumbnail_url} className="w-full h-full rounded-full object-cover border-2 border-white dark:border-black" alt="thumb" />
       </div>
       <span className={`text-[8px] font-black uppercase truncate w-full text-center ${isAdmin ? 'text-yellow-600' : isSOS ? 'text-red-600' : 'text-gray-500'}`}>
-        {isAdmin ? 'Supreme' : story.contributors?.name.split(' ')[0]}
+        {isAdmin ? 'Supreme' : (story.contributors?.name?.split(' ')[0] || 'Member')}
       </span>
     </div>
   );
