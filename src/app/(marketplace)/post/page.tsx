@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import Image from "next/image";
 
 export default function PostListingPage() {
   const router = useRouter();
   const supabase = createClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -17,7 +19,10 @@ export default function PostListingPage() {
     condition: "like-new",
     isRequest: false,
   });
+  const [images, setImages] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const categories = ["Books", "Electronics", "Clothing", "Furniture", "Services", "Other"];
@@ -35,6 +40,49 @@ export default function PostListingPage() {
     }
   };
 
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.currentTarget.files;
+    if (!files) return;
+
+    const newFiles = Array.from(files);
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    const validFiles = [];
+
+    for (const file of newFiles) {
+      if (file.size > maxSize) {
+        setError(`${file.name} is too large (max 5MB)`);
+        continue;
+      }
+      if (!file.type.startsWith("image/")) {
+        setError(`${file.name} is not an image`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length > 0) {
+      setImages((prev) => [...prev, ...validFiles]);
+      
+      // Create previews
+      const newPreviews = await Promise.all(
+        validFiles.map(
+          (file) =>
+            new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(file);
+            })
+        )
+      );
+      setPreviews((prev) => [...prev, ...newPreviews]);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index));
+    setPreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -44,6 +92,31 @@ export default function PostListingPage() {
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData?.session?.user?.id) {
         throw new Error("Not authenticated");
+      }
+
+      let imageUrls: string[] = [];
+
+      // Upload images to Supabase Storage
+      if (images.length > 0) {
+        setIsUploading(true);
+        const bucket = "listing-images";
+        const userId = sessionData.session.user.id;
+        const timestamp = Date.now();
+
+        for (let i = 0; i < images.length; i++) {
+          const file = images[i];
+          const filename = `${userId}/${timestamp}-${i}-${file.name}`;
+
+          const { data, error: uploadError } = await supabase.storage
+            .from(bucket)
+            .upload(filename, file, { cacheControl: "3600", upsert: false });
+
+          if (uploadError) throw uploadError;
+
+          const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
+          imageUrls.push(urlData.publicUrl);
+        }
+        setIsUploading(false);
       }
 
       const { error: insertError } = await supabase.from("listings").insert([
@@ -63,7 +136,7 @@ export default function PostListingPage() {
           views: 0,
           saved_count: 0,
           currency: "NGN",
-          images: [],
+          images: imageUrls,
         },
       ]);
 
@@ -72,6 +145,7 @@ export default function PostListingPage() {
       router.push("/market");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create listing");
+      setIsUploading(false);
     } finally {
       setIsLoading(false);
     }
@@ -113,6 +187,52 @@ export default function PostListingPage() {
               className="w-full px-4 py-3 border border-gray-300 dark:border-[#2a3942] rounded-lg bg-white dark:bg-[#202c33] text-gray-900 dark:text-white focus:ring-2 focus:ring-wa-teal"
               required
             />
+          </div>
+
+          {/* Image Upload Section */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              📸 Images (up to 5MB each)
+            </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="w-full py-3 border-2 border-dashed border-wa-teal rounded-lg hover:bg-blue-50 dark:hover:bg-[#202c33] text-wa-teal font-semibold transition-colors disabled:opacity-50"
+            >
+              {isUploading ? "Uploading..." : "Click to upload or drag & drop"}
+            </button>
+
+            {/* Image Previews */}
+            {previews.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
+                {previews.map((preview, index) => (
+                  <div key={index} className="relative group">
+                    <img
+                      src={preview}
+                      alt={`Preview ${index + 1}`}
+                      className="w-full h-24 object-cover rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-gray-500 mt-2">{previews.length} image(s) selected</p>
           </div>
 
           <div>

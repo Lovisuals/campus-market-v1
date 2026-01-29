@@ -95,8 +95,7 @@ export default function MarketPage() {
   };
 
   const handleOpenGallery = (images: string[], index: number) => {
-    console.log("Gallery preview:", { imageCount: images.length, currentIndex: index });
-    // Gallery modal functionality to be implemented with dialog component
+    console.log("Gallery opened:", images[index]);
   };
 
   const handlers = {
@@ -112,9 +111,12 @@ export default function MarketPage() {
       {/* Header */}
       <div className="sticky top-0 z-40 bg-white dark:bg-[#111b21] border-b border-gray-100 dark:border-[#2a3942]">
         <div className="px-4 py-4">
-          <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-4">
-            {viewMode === "all" ? "📦 For Sale" : "🙋 Buy Requests"}
-          </h1>
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-2xl font-black text-gray-900 dark:text-white">
+              {viewMode === "all" ? "📦 For Sale" : "🙋 Buy Requests"}
+            </h1>
+            <button className="text-2xl hover:scale-110 transition-transform">🔔</button>
+          </div>
 
           {/* Search Bar */}
           <div className="flex gap-2 mb-4">
@@ -122,11 +124,11 @@ export default function MarketPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search listings..."
+              placeholder="Search items, sellers..."
               className="flex-1 px-4 py-2 bg-gray-100 dark:bg-[#2a3942] rounded-full text-sm outline-none focus:ring-2 focus:ring-wa-teal"
             />
-            <button className="p-2 bg-gray-100 dark:bg-[#2a3942] rounded-full text-gray-600">
-              ⚙️
+            <button className="p-2 bg-gray-100 dark:bg-[#2a3942] rounded-full text-gray-600 hover:text-wa-teal transition-colors">
+              🔍
             </button>
           </div>
 
@@ -140,7 +142,7 @@ export default function MarketPage() {
                   : "bg-gray-100 dark:bg-[#2a3942] text-gray-700 dark:text-gray-300"
               }`}
             >
-              All Listings
+              All Items
             </button>
             <button
               onClick={() => setViewMode("requests")}
@@ -150,27 +152,22 @@ export default function MarketPage() {
                   : "bg-gray-100 dark:bg-[#2a3942] text-gray-700 dark:text-gray-300"
               }`}
             >
-              Buy Requests
+              Requests
             </button>
           </div>
         </div>
       </div>
 
-      {/* Stories Rail */}
-      <div className="px-4 py-3 flex gap-2 overflow-x-auto snap-x-mandatory border-b border-gray-100 dark:border-[#2a3942]">
-        <div className="flex gap-2 flex-shrink-0">⚡ Stories coming soon</div>
-      </div>
-
       {/* Campus Pills */}
-      <div className="px-4 py-3 flex gap-2 overflow-x-auto snap-x-mandatory">
+      <div className="px-4 py-3 flex gap-2 overflow-x-auto snap-x-mandatory bg-gray-50 dark:bg-[#0b141a]">
         {campuses.map((campus) => (
           <button
             key={campus}
             onClick={() => setActiveCampus(campus)}
             className={`snap-center flex-shrink-0 px-4 py-2 rounded-full font-bold text-sm whitespace-nowrap transition-all ${
               activeCampus === campus
-                ? "bg-wa-teal text-white"
-                : "bg-gray-100 dark:bg-[#2a3942] text-gray-700 dark:text-gray-300"
+                ? "bg-wa-teal text-white shadow-md shadow-green-200 dark:shadow-none"
+                : "bg-white dark:bg-[#202c33] text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-[#2a3942]"
             }`}
           >
             {campus}
@@ -194,24 +191,36 @@ export default function MarketPage() {
             {listings.map((listing) => (
               <div
                 key={listing.id}
-                className="bg-white dark:bg-[#202c33] rounded-xl overflow-hidden border border-gray-100 dark:border-[#2a3942] hover:shadow-lg transition-shadow"
+                className="bg-white dark:bg-[#202c33] rounded-lg overflow-hidden border border-gray-100 dark:border-[#2a3942] hover:shadow-md transition-shadow"
               >
                 <div className="p-4 space-y-3">
                   <h3 className="font-bold text-gray-900 dark:text-white line-clamp-2">{listing.title}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                    {listing.description}
+                  </p>
+                  <div className="flex gap-2 text-xs">
+                    <span className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
+                      {listing.category}
+                    </span>
+                    <span className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-1 rounded-full">
+                      {listing.campus}
+                    </span>
+                  </div>
                   <p className="text-2xl font-black text-wa-teal">
-                    ₦{typeof listing.price === "number" ? listing.price.toLocaleString() : listing.price || "TBD"}
+                    {listing.is_request ? "Budget: " : ""}₦
+                    {typeof listing.price === "number" ? listing.price.toLocaleString() : listing.price || "TBD"}
                   </p>
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleBuyClick(listing)}
-                      className="flex-1 py-2 bg-wa-teal text-white rounded-lg font-bold text-sm"
+                      className="flex-1 py-2 bg-wa-teal text-white rounded-lg font-bold text-sm hover:bg-[#075e54] transition-colors"
                     >
                       Contact
                     </button>
                     {viewMode === "requests" && (
                       <button
                         onClick={() => handleFulfillRequest(listing)}
-                        className="flex-1 py-2 bg-[#8E44AD] text-white rounded-lg font-bold text-sm"
+                        className="flex-1 py-2 bg-[#8E44AD] text-white rounded-lg font-bold text-sm hover:bg-[#7a3a96] transition-colors"
                       >
                         Fulfill
                       </button>

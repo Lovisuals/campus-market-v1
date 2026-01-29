@@ -46,12 +46,19 @@ export default function RootLayout({
                 </span>
               </Link>
               
-              <nav className="flex items-center gap-4">
+              <nav className="flex items-center gap-2">
                 <Link 
                   href="/market" 
-                  className="text-sm font-bold text-gray-600 hover:text-green-600 transition-colors"
+                  className="text-sm font-bold text-gray-600 hover:text-green-600 transition-colors px-3 py-2"
                 >
-                  Browse
+                  📦 Browse
+                </Link>
+                <Link 
+                  href="/chats" 
+                  className="text-sm font-bold text-gray-600 hover:text-blue-600 transition-colors px-3 py-2 relative"
+                >
+                  💬 Chats
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-blue-600 rounded-full"></span>
                 </Link>
                 <Link 
                   href="/post" 
