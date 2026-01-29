@@ -120,7 +120,7 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: { activeC
 
   return (
     <div className="bg-[var(--wa-chat-bg)] border-b border-[var(--border)] pt-2 pb-4">
-      {/* Campus Filters */}
+      {/* 📍 CAMPUS FILTERS */}
       <div className="flex gap-2 overflow-x-auto px-5 mb-4 scrollbar-hide no-bounce">
         {CAMPUS_PILLS.map(pill => (
           <button 
@@ -138,7 +138,7 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: { activeC
       </div>
 
       <div className="flex items-start px-5 gap-4 overflow-x-auto scrollbar-hide snap-x-mandatory">
-        {/* Supreme Admin Pin - Always Visible */}
+        {/* 👑 SUPREME ADMIN PIN - ALWAYS VISIBLE */}
         <div className="flex-shrink-0 flex items-center gap-4 border-r border-[var(--border)] pr-4 min-w-[80px]">
           {eliteStories.length > 0 ? (
             eliteStories.map(story => (
@@ -150,9 +150,10 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: { activeC
               />
             ))
           ) : (
+            /* 🌑 No Updates Placeholder - Persistent Section */
             <div className="flex flex-col items-center gap-1 opacity-50 group cursor-default">
               <div className="w-14 h-14 rounded-full border-2 border-dashed border-yellow-600/40 flex items-center justify-center bg-yellow-500/10 backdrop-blur-sm">
-                <span className="text-2xl group-hover:scale-110 transition-transform"></span>
+                <span className="text-2xl group-hover:scale-110 transition-transform">👑</span>
               </div>
               <span className="text-[7px] font-black uppercase tracking-widest text-yellow-700">
                 No Updates
@@ -161,7 +162,7 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: { activeC
           )}
         </div>
 
-        {/* Dynamic Portal */}
+        {/* ➕ DYNAMIC PORTAL */}
         <div 
           onClick={() => isAdmin 
             ? setShowPostModal(true) 
@@ -172,14 +173,14 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: { activeC
           <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl shadow-lg border-2 border-white transition-all
             ${isAdmin ? 'bg-yellow-500 scale-110 shadow-yellow-500/40' : 'bg-blue-600'}`}
           >
-            {isAdmin ? '' : '+'}
+            {isAdmin ? '👑' : '+'}
           </div>
           <span className={`text-[8px] font-black uppercase text-center ${isAdmin ? 'text-yellow-600' : 'text-blue-600'}`}>
             {isAdmin ? 'Post Elite' : 'Add Story'}
           </span>
         </div>
 
-        {/* User Stories */}
+        {/* 👤 USER STORIES */}
         {loading ? (
           <div className="w-14 h-14 rounded-full bg-gray-200 animate-pulse" />
         ) : (
@@ -190,14 +191,15 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: { activeC
               onClick={() => setViewingStory(story)} 
             />
           ))
-        )}
+        )
+        }
       </div>
 
-      {/* Admin Post Modal */}
+      {/* 👑 ADMIN POST MODAL */}
       {showPostModal && (
         <div className="fixed inset-0 z-[2000] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
           <div className="bg-[var(--surface)] w-full max-w-sm rounded-[32px] p-8 border border-[var(--border)] shadow-2xl animate-scale-up">
-            <h2 className="text-lg font-black mb-6 flex items-center gap-2">SUPREME UPLOAD</h2>
+            <h2 className="text-lg font-black mb-6 flex items-center gap-2">👑 SUPREME UPLOAD</h2>
             <input 
               type="text" 
               placeholder="Cloudinary Video URL" 
@@ -243,7 +245,7 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: { activeC
         </div>
       )}
 
-      {/* Story Viewer */}
+      {/* 📺 STORY VIEWER */}
       {viewingStory && (
         <div className="fixed inset-0 z-[1000] bg-black animate-fade-in flex flex-col">
           <div className="absolute top-0 w-full h-1 bg-white/20 z-[1001]">
