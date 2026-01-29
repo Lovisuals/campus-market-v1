@@ -1,0 +1,188 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --wa-teal: #008069;
+  --wa-dark-teal: #075E54;
+  --wa-light: #25D366;
+  --wa-chat-bg: #EFE7DE;
+  --surface: #ffffff;
+  --border: #e5e7eb;
+  --wa-neon: #00ffaa;
+}
+
+body.dark-mode {
+  --wa-chat-bg: #0b141a;
+  --surface: #111b21;
+  --border: #2a3942;
+  background-color: #0b141a;
+  color: #e9edef;
+}
+
+@layer components {
+  /* Sovereign Glassmorphism (Premium WA Feel) */
+  .glass-3d {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+    border-radius: 1.5rem;
+  }
+  .dark-mode .glass-3d {
+    background: rgba(17, 27, 33, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  /* WhatsApp-Accurate Input Fields */
+  .wa-input {
+    width: 100%;
+    padding: 12px 16px;
+    background: #f0f2f5;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    outline: none;
+    font-size: 15px;
+    transition: all 0.2s ease;
+    color: #111b21;
+  }
+  .dark-mode .wa-input {
+    background: #2a3942;
+    color: white;
+  }
+  .wa-input:focus {
+    background: white;
+    border-color: var(--wa-teal);
+    box-shadow: 0 0 0 2px rgba(0, 128, 105, 0.1);
+  }
+  .dark-mode .wa-input:focus {
+    background: #202c33;
+  }
+
+  /* Floating Action Button */
+  .fab {
+    width: 56px;
+    height: 56px;
+    background: var(--wa-teal);
+    color: white;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: 300;
+    box-shadow: 0 4px 12px rgba(0, 128, 105, 0.4);
+    transition: transform 0.2s ease;
+  }
+  .fab:active {
+    transform: scale(0.92);
+  }
+}
+
+@layer utilities {
+  /* Stories Rail – Infinite Horizontal Snap Scroll */
+  .snap-x-mandatory {
+    scroll-snap-type: x mandatory;
+    overflow-x: auto;
+    display: flex;
+    -webkit-overflow-scrolling: touch;
+  }
+  .snap-center-item {
+    scroll-snap-align: center;
+    flex-shrink: 0;
+    width: 100%;
+  }
+  /* --- SOVEREIGN STORIES ENGINE ANIMATIONS --- */
+
+/* 1. Progress Bar filling 0% to 100% over 15s */
+@keyframes progress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+.progress-bar {
+  animation: progress 15s linear forwards;
+}
+
+/* 2. Smooth Fullscreen Fade */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 3. Admin Modal Scale Pop */
+.animate-scale-up {
+  animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes scaleUp {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* 4. Search Bar Glow (WhatsApp Style) */
+.search-container {
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0 16px;
+  transition: all 0.3s ease;
+}
+.search-container:focus-within {
+  border-color: var(--wa-teal);
+  box-shadow: 0 4px 12px rgba(0, 128, 105, 0.1);
+}
+  /* Scrollbar Concealment */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Mobile UX Polish */
+  .no-bounce { overscroll-behavior-y: contain; }
+  .tap:active { transform: scale(0.95); transition: transform 0.1s ease; }
+  .btn-active:active { transform: scale(0.95); transition: transform 0.1s ease; }
+  .noselect { user-select: none; -webkit-user-select: none; }
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+
+  /* Verified Badge Pulse Ring (Green Breathing Effect) */
+  .verified-pulse {
+    animation: ring-pulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+  }
+  @keyframes ring-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.4); }
+    70%  { box-shadow: 0 0 0 10px rgba(37, 211, 102, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }
+  }
+
+  /* Global Alert Ticker (Admin Broadcasts) */
+  .ticker-container {
+    overflow: hidden;
+    white-space: nowrap;
+    background: #000;
+    padding: 8px 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--wa-neon);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .ticker-content {
+    display: inline-block;
+    animation: ticker 25s linear infinite;
+  }
+  @keyframes ticker {
+    0%   { transform: translateX(100vw); }
+    100% { transform: translateX(-100%); }
+  }
+  .ticker-container:hover .ticker-content {
+    animation-play-state: paused;
+  }
+}
