@@ -48,7 +48,14 @@ export default function PostListingPage() {
 
     const newFiles = Array.from(files);
     const maxSize = 5 * 1024 * 1024; // 5MB
-    const validFiles = [];
+    const MAX_IMAGES = 3;
+    const validFiles: File[] = [];
+
+    // Prevent exceeding the maximum allowed images
+    if (images.length + newFiles.length > MAX_IMAGES) {
+      setError(`Maximum ${MAX_IMAGES} images allowed per listing`);
+      return;
+    }
 
     for (const file of newFiles) {
       if (file.size > maxSize) {
@@ -64,7 +71,7 @@ export default function PostListingPage() {
 
     if (validFiles.length > 0) {
       setImages((prev) => [...prev, ...validFiles]);
-      
+
       // Create previews
       const newPreviews = await Promise.all(
         validFiles.map(
@@ -91,12 +98,29 @@ export default function PostListingPage() {
     setError(null);
 
     try {
+      // Validate images count before proceeding
+      if (images.length === 0) {
+        throw new Error("At least 1 image is required");
+      }
+      if (images.length > 3) {
+        throw new Error("Maximum 3 images allowed");
+      }
+
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData?.session?.user?.id) {
         throw new Error("Not authenticated");
       }
 
+      // Check if current user is admin to auto-verify
+      const { data: userRow } = await supabase
+        .from("users")
+        .select("is_admin")
+        .eq("id", sessionData.session.user.id)
+        .single();
+      const isAdminUser = !!userRow?.is_admin;
+
       let imageUrls: string[] = [];
+      let imagePaths: string[] = [];
 
       // Upload images to Supabase Storage
       if (images.length > 0) {
@@ -104,7 +128,7 @@ export default function PostListingPage() {
         const bucket = "listing-images";
         const userId = sessionData.session.user.id;
         const timestamp = Date.now();
-
+        
         for (let i = 0; i < images.length; i++) {
           const file = images[i];
           const filename = `${userId}/${timestamp}-${i}-${file.name}`;
@@ -117,32 +141,33 @@ export default function PostListingPage() {
 
           const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
           imageUrls.push(urlData.publicUrl);
+          imagePaths.push(data.path);
         }
         setIsUploading(false);
       }
 
-      const { error: insertError } = await supabase.from("listings").insert([
-        {
-          seller_id: sessionData.session.user.id,
-          title: formData.title,
-          description: formData.description,
-          category: formData.category,
-          price: formData.isRequest ? null : parseFloat(formData.price),
-          budget: formData.isRequest ? parseFloat(formData.price) : null,
-          campus: formData.campus,
-          condition: formData.condition,
-          is_request: formData.isRequest,
-          is_approved: false,
-          is_verified: false,
-          status: "active",
-          views: 0,
-          saved_count: 0,
-          currency: "NGN",
-          images: imageUrls,
-        },
-      ]);
+      // Send data to server API which will validate and insert the listing
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        price: formData.isRequest ? null : parseFloat(formData.price),
+        campus: formData.campus,
+        condition: formData.condition,
+        isRequest: formData.isRequest,
+        images: imagePaths,
+      };
 
-      if (insertError) throw insertError;
+      const res = await fetch("/api/listings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err?.error || "Failed to create listing");
+      }
 
       setShowVerificationForm(true); // Show verification form after listing creation
     } catch (err) {
