@@ -139,6 +139,7 @@ export default function PostListingPage() {
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
+                title="Select item category"
                 className="w-full px-4 py-3 border border-gray-300 dark:border-[#2a3942] rounded-lg bg-white dark:bg-[#202c33] text-gray-900 dark:text-white focus:ring-2 focus:ring-wa-teal"
                 required
               >
@@ -176,6 +177,7 @@ export default function PostListingPage() {
                 name="campus"
                 value={formData.campus}
                 onChange={handleChange}
+                title="Select your campus"
                 className="w-full px-4 py-3 border border-gray-300 dark:border-[#2a3942] rounded-lg bg-white dark:bg-[#202c33] text-gray-900 dark:text-white focus:ring-2 focus:ring-wa-teal"
                 required
               >
@@ -196,6 +198,7 @@ export default function PostListingPage() {
                 name="condition"
                 value={formData.condition}
                 onChange={handleChange}
+                title="Select item condition"
                 className="w-full px-4 py-3 border border-gray-300 dark:border-[#2a3942] rounded-lg bg-white dark:bg-[#202c33] text-gray-900 dark:text-white focus:ring-2 focus:ring-wa-teal"
               >
                 <option value="new">New</option>

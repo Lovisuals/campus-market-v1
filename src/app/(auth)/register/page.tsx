@@ -122,6 +122,7 @@ export default function RegisterPage() {
               name="campus"
               value={formData.campus}
               onChange={handleChange}
+              title="Select your campus"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-wa-teal focus:border-transparent"
               required
             >

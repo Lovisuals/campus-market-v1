@@ -55,6 +55,7 @@ export default function SearchPage() {
                 name="category"
                 value={filters.category}
                 onChange={handleFilterChange}
+                title="Select category to filter"
                 className="w-full px-4 py-3 border border-gray-300 dark:border-[#2a3942] rounded-lg bg-white dark:bg-[#202c33] text-gray-900 dark:text-white focus:ring-2 focus:ring-wa-teal"
               >
                 <option value="">All Categories</option>
@@ -74,6 +75,7 @@ export default function SearchPage() {
                 name="campus"
                 value={filters.campus}
                 onChange={handleFilterChange}
+                title="Select campus to filter"
                 className="w-full px-4 py-3 border border-gray-300 dark:border-[#2a3942] rounded-lg bg-white dark:bg-[#202c33] text-gray-900 dark:text-white focus:ring-2 focus:ring-wa-teal"
               >
                 <option value="">All Campuses</option>
@@ -122,6 +124,7 @@ export default function SearchPage() {
               <select
                 name="condition"
                 value={filters.condition}
+                title="Select condition to filter"
                 onChange={handleFilterChange}
                 className="w-full px-4 py-3 border border-gray-300 dark:border-[#2a3942] rounded-lg bg-white dark:bg-[#202c33] text-gray-900 dark:text-white focus:ring-2 focus:ring-wa-teal"
               >
