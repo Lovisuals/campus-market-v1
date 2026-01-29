@@ -24,6 +24,8 @@ export default function PostListingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showVerificationForm, setShowVerificationForm] = useState(false);
+  const [verificationReason, setVerificationReason] = useState("");
 
   const categories = ["Books", "Electronics", "Clothing", "Furniture", "Services", "Other"];
   const campuses = ["UNILAG", "LASU", "YABATECH", "TASUED", "OOU", "UI", "OAU", "UNN"];
@@ -142,12 +144,46 @@ export default function PostListingPage() {
 
       if (insertError) throw insertError;
 
-      router.push("/market");
+      setShowVerificationForm(true); // Show verification form after listing creation
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create listing");
       setIsUploading(false);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleVerificationRequest = async () => {
+    try {
+      if (!verificationReason.trim()) {
+        setError("Please explain why you should be verified");
+        return;
+      }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: userData } = await supabase
+        .from("users")
+        .select("full_name, email")
+        .eq("id", sessionData.session?.user?.id)
+        .single();
+
+      const { error: verifyError } = await supabase
+        .from("verification_requests")
+        .insert([
+          {
+            seller_id: sessionData.session?.user?.id,
+            seller_name: userData?.full_name || "Unknown",
+            seller_email: userData?.email || "",
+            reason: verificationReason,
+            status: "pending",
+          },
+        ]);
+
+      if (verifyError) throw verifyError;
+
+      router.push("/market");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to request verification");
     }
   };
 
@@ -344,6 +380,62 @@ export default function PostListingPage() {
           </button>
         </form>
       </div>
+
+      {/* Verification Request Modal */}
+      {showVerificationForm && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#202c33] rounded-2xl p-8 max-w-md w-full space-y-4">
+            <div className="text-center">
+              <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-2">
+                ✅ Request Verification
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">
+                Your listing is published! Would you like to request a seller verification badge?
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                Why should you be verified?
+              </label>
+              <textarea
+                value={verificationReason}
+                onChange={(e) => setVerificationReason(e.target.value)}
+                placeholder="Tell us about your credibility, experience, or why you should be verified..."
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-[#2a3942] rounded-lg dark:bg-[#111b21] text-gray-900 dark:text-white focus:ring-2 focus:ring-wa-teal"
+                rows={4}
+                title="Enter reason for verification request"
+              />
+            </div>
+
+            {error && (
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => router.push("/market")}
+                className="flex-1 py-3 bg-gray-200 dark:bg-[#3a4a52] text-gray-900 dark:text-white font-bold rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Skip For Now
+              </button>
+              <button
+                onClick={handleVerificationRequest}
+                disabled={isLoading}
+                className="flex-1 py-3 bg-wa-teal text-white font-bold rounded-lg hover:bg-[#075e54] disabled:opacity-50 transition-colors"
+              >
+                {isLoading ? "Sending..." : "Request Verification"}
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500 text-center">
+              🔍 Admins review all verification requests within 24 hours
+            </p>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -15,6 +15,16 @@ interface AdminListing {
   status: string;
 }
 
+interface VerificationRequest {
+  id: string;
+  seller_id: string;
+  seller_name: string;
+  seller_email: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   const supabase = createClient();
@@ -22,33 +32,74 @@ export default function AdminDashboard() {
     totalUsers: 0,
     totalListings: 0,
     verifiedListings: 0,
-    totalRevenue: 0,
+    pendingVerifications: 0,
   });
   const [listings, setListings] = useState<AdminListing[]>([]);
+  const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"posts" | "verifications">("posts");
 
   useEffect(() => {
-    const fetchAdminData = async () => {
+    const checkAdminAndFetch = async () => {
       setIsLoading(true);
       try {
-        // Fetch all listings for admin control
+        // Check if user is admin
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) {
+          router.push("/login");
+          return;
+        }
+
+        // Fetch user role
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("is_admin")
+          .eq("id", session.user.id)
+          .single();
+
+        if (userError || !userData?.is_admin) {
+          router.push("/market");
+          return;
+        }
+
+        setIsAdmin(true);
+
+        // Fetch all listings
         const { data: allListings, error: listingsError } = await supabase
           .from("listings")
           .select("*")
           .order("created_at", { ascending: false });
 
         if (listingsError) throw listingsError;
-
         setListings(allListings || []);
+
+        // Fetch verification requests
+        const { data: verReqs, error: verError } = await supabase
+          .from("verification_requests")
+          .select("*")
+          .eq("status", "pending")
+          .order("created_at", { ascending: false });
+
+        if (!verError) {
+          setVerificationRequests(verReqs || []);
+        }
+
+        // Fetch user count
+        const { count: userCount, error: countError } = await supabase
+          .from("users")
+          .select("*", { count: "exact" });
 
         // Calculate stats
         const verified = (allListings || []).filter((l) => l.is_verified).length;
+        const pending = (verReqs || []).filter((v) => v.status === "pending").length;
+
         setStats({
-          totalUsers: 0,
+          totalUsers: userCount || 0,
           totalListings: allListings?.length || 0,
           verifiedListings: verified,
-          totalRevenue: 0,
+          pendingVerifications: pending,
         });
       } catch (error) {
         console.error("Error fetching admin data:", error);
@@ -57,8 +108,58 @@ export default function AdminDashboard() {
       }
     };
 
-    fetchAdminData();
-  }, [supabase]);
+    checkAdminAndFetch();
+  }, [router, supabase]);
+
+  const handleApproveVerification = async (requestId: string, sellerId: string) => {
+    try {
+      // Update verification request
+      const { error: updateError } = await supabase
+        .from("verification_requests")
+        .update({ status: "approved" })
+        .eq("id", requestId);
+
+      if (updateError) throw updateError;
+
+      // Verify all listings for this seller
+      const { error: verifyError } = await supabase
+        .from("listings")
+        .update({ is_verified: true })
+        .eq("seller_id", sellerId);
+
+      if (verifyError) throw verifyError;
+
+      setVerificationRequests((prev) => prev.filter((v) => v.id !== requestId));
+      setStats((prev) => ({
+        ...prev,
+        pendingVerifications: prev.pendingVerifications - 1,
+        verifiedListings: prev.verifiedListings + 1,
+      }));
+    } catch (error) {
+      console.error("Error approving verification:", error);
+      alert("Failed to approve verification");
+    }
+  };
+
+  const handleRejectVerification = async (requestId: string) => {
+    try {
+      const { error } = await supabase
+        .from("verification_requests")
+        .update({ status: "rejected" })
+        .eq("id", requestId);
+
+      if (error) throw error;
+
+      setVerificationRequests((prev) => prev.filter((v) => v.id !== requestId));
+      setStats((prev) => ({
+        ...prev,
+        pendingVerifications: prev.pendingVerifications - 1,
+      }));
+    } catch (error) {
+      console.error("Error rejecting verification:", error);
+      alert("Failed to reject verification");
+    }
+  };
 
   const handleDeletePost = async (id: string) => {
     try {
