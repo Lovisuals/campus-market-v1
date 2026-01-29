@@ -16,7 +16,7 @@ The system is built on **Next.js 15 (App Router)**, **Tailwind CSS**, and **Supa
 ### 🔑 Critical Configuration
 * **Supabase URL:** `https://vimovhpweucvperwhyzi.supabase.co`
 * **Supabase Anon Key:** *Resolved via `process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY`*
-* **Admin Identification (Sovereign Role):** The system identifies the "Supreme Admin" by checking the hardcoded `user_id` or metadata in `StoriesRail.tsx` and `page.tsx`.
+* **Admin Identification (Sovereign Role):** The system identifies the "Supreme Admin" by checking the hardcoded `user_id` or metadata in the authentication flow and page.tsx.
 
 ## 3. Database Schema (Supabase/PostgreSQL)
 The database is structured to handle high-concurrency "Story" views and product swiping.
@@ -46,12 +46,14 @@ The database is structured to handle high-concurrency "Story" views and product 
 ### A. The Singleton Client (`src/lib/supabase/client.ts`)
 To prevent connection exhaustion, the app uses a Singleton Pattern for the Supabase instance.
 
-### B. The Sovereign Stories Rail (`src/app/market/StoriesRail.tsx`)
-* **Realtime Sync:** Uses `supabase.channel` to listen for `INSERT` and `DELETE` events on the `videos` table.
+### B. Stories Rail Implementation
+* **Location:** Market page (`src/app/(marketplace)/market/page.tsx`)
+* **Realtime Sync:** Uses `supabase.channel` to listen for `INSERT` and `DELETE` events on the `videos` table (when implemented).
 * **UI Physics:** Uses `snap-x-mandatory` for mobile horizontal swiping.
 * **Admin Logic:** Stories where `is_admin === true` receive a `border-[#FFD700]` (Gold) and a unique pulse animation to distinguish "Supreme" content.
 
-### C. The Product Card (`src/app/market/ProductCard.tsx`)
+### C. Product Card Implementation
+* **Location:** Market page listing cards in `src/app/(marketplace)/market/page.tsx`
 * **Multi-Image Carousel:** Fixed via `flex overflow-x-auto snap-x`. Images are parsed from JSON strings or arrays dynamically using `useMemo`.
 * **Chat-to-Buy:** Direct `wa.me` links. The logic constructs the link using `encodeURIComponent` to include the product name in the seller's initial message.
 * **Verification Pulse:** If `item.is_verified` is true, a CSS keyframe animation `ring-pulse` creates a green breathing effect.
@@ -73,58 +75,41 @@ To prevent connection exhaustion, the app uses a Singleton Pattern for the Supab
 
 ---
 *End of Protocol.*
-├── src
-│   ├── app
-│   │   ├── api
-│   │   │   ├── admin
-│   │   │   │   └── generate
-│   │   │   │       └── route.js
-│   │   │   ├── health
-│   │   │   │   └── route.js
-│   │   │   ├── studio
-│   │   │   │   └── upload
-│   │   │   │       └── route.js
-│   │   │   └── test
-│   │   │       └── route.ts
-│   │   ├── market
-│   │   │   ├── ProductCard.tsx
-│   │   │   ├── StoriesRail.tsx
-│   │   │   └── page.tsx
-│   │   ├── studio
-│   │   │   ├── StudioClient.tsx
-│   │   │   └── page.tsx
-│   │   ├── favicon.ico
+
+## Directory Structure (Current)
+```
+├── src/
+│   ├── app/
+│   │   ├── (admin)/
+│   │   │   ├── dashboard/page.tsx
+│   │   │   └── moderation/page.tsx
+│   │   ├── (auth)/
+│   │   │   ├── login/page.tsx
+│   │   │   ├── register/page.tsx
+│   │   │   └── verify/page.tsx
+│   │   ├── (marketplace)/
+│   │   │   ├── market/page.tsx
+│   │   │   ├── post/page.tsx
+│   │   │   ├── profile/page.tsx
+│   │   │   └── search/page.tsx
+│   │   ├── (messaging)/
+│   │   │   ├── chats/page.tsx
+│   │   │   └── communities/page.tsx
+│   │   ├── api/
+│   │   ├── studio/
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   ├── opengraph-image.tsx
 │   │   ├── page.tsx
-│   │   └── twitter-image.png
-│   └── lib
-│       ├── supabase
-│       │   ├── client.ts
-│       │   ├── proxy.ts
-│       │   ├── server.ts
-│       │   └── utils.ts
-│       ├── jwt.ts
-│       └── utils.ts
-├── supabase
-│   └── migrations
-│       └── 20251229120647_add_admin_columns.sql
-├── PROJECT_KNOWLEDGE.md
-├── README.md
-├── REBUILD_IDENTIFIER.txt
-├── build-fix.txt
-├── components.json
-├── dev-null.css
-├── eslint.config.mjs
-├── next-env.d.ts
-├── next.config.js
-├── next.config.ts
-├── package-lock.json
-├── package.json
-├── postcss.config.mjs
-├── proxy.ts
-├── tailwind.config.ts
-├── tsconfig.json
-├── tsconfig.tsbuildinfo
-└── vercel.json
+│   │   └── favicon.ico
+│   ├── components/
+│   │   ├── ui/ (Button, Input, Dialog, Badge)
+│   │   └── shared/
+│   └── lib/
+│       ├── hooks/ (useAuth, useListings)
+│       ├── supabase/ (client, server, proxy, utils)
+│       ├── types/ (Comprehensive TypeScript definitions)
+│       ├── utils.ts
+│       └── jwt.ts
+└── supabase/migrations/
+```
