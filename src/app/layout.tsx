@@ -30,39 +30,39 @@ export default function RootLayout({
       <body className="bg-white text-gray-900 antialiased min-h-screen flex flex-col">
         <ThemeProvider
           attribute="class"
-          defaultTheme="light" // Defaulting to light for better product visibility
+          defaultTheme="light"
           enableSystem
           disableTransitionOnChange
         >
           {/* WhatsApp-Style Sticky Header */}
-          <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-gray-100">
+          <header className="sticky top-0 z-50 w-full bg-gradient-to-r from-wa-teal to-[#006d59] shadow-md">
             <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
               <Link href="/" className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-black text-xs">C</span>
+                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-md">
+                  <span className="text-wa-teal font-black text-lg">🛍️</span>
                 </div>
-                <span className="font-black text-xl tracking-tighter uppercase italic">
-                  Market<span className="text-green-600">P2P</span>
+                <span className="font-black text-lg tracking-tight text-white">
+                  Campus Market
                 </span>
               </Link>
               
-              <nav className="flex items-center gap-2">
+              <nav className="flex items-center gap-1 sm:gap-3">
                 <Link 
                   href="/market" 
-                  className="text-sm font-bold text-gray-600 hover:text-green-600 transition-colors px-3 py-2"
+                  className="text-sm font-bold text-white hover:bg-white/20 transition-all px-3 py-2 rounded-lg"
                 >
                   📦 Browse
                 </Link>
                 <Link 
                   href="/chats" 
-                  className="text-sm font-bold text-gray-600 hover:text-blue-600 transition-colors px-3 py-2 relative"
+                  className="text-sm font-bold text-white hover:bg-white/20 transition-all px-3 py-2 rounded-lg relative"
                 >
                   💬 Chats
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-blue-600 rounded-full"></span>
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-white rounded-full"></span>
                 </Link>
                 <Link 
                   href="/post" 
-                  className="bg-green-600 text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-green-700 transition-all shadow-md shadow-green-100"
+                  className="bg-white text-wa-teal px-4 py-2 rounded-full text-xs font-black hover:shadow-lg transition-all"
                 >
                   Sell Fast
                 </Link>
