@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useListings } from "@/lib/hooks/useListings";
-import ProductCard from "@/app/market/ProductCard";
-import StoriesRail from "@/app/market/StoriesRail";
 import { Listing } from "@/lib/types";
 
 export default function MarketPage() {
+  const router = useRouter();
   const supabase = createClient();
   const [activeCampus, setActiveCampus] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -55,29 +54,49 @@ export default function MarketPage() {
     fetchListings();
   }, [activeCampus, searchQuery, viewMode, supabase]);
 
-  const handleBuyClick = (item: Listing) => {
-    // TODO: Implement chat/contact flow
-    console.log("Buy clicked:", item);
+  const handleBuyClick = async (item: Listing) => {
+    try {
+      router.push(`/chats?seller_id=${item.seller_id}`);
+    } catch (error) {
+      console.error("Error initiating contact:", error);
+    }
   };
 
-  const handleExpungeProduct = (id: string) => {
-    // TODO: Implement admin delete
-    console.log("Delete clicked:", id);
+  const handleExpungeProduct = async (id: string) => {
+    if (!confirm("Delete this listing permanently?")) return;
+    try {
+      const { error } = await supabase.from("listings").delete().eq("id", id);
+      if (error) throw error;
+      setListings((prev) => prev.filter((l) => l.id !== id));
+    } catch (error) {
+      console.error("Error deleting listing:", error);
+    }
   };
 
-  const handleVerifyProduct = (id: string, current: boolean) => {
-    // TODO: Implement admin verify
-    console.log("Verify clicked:", id, current);
+  const handleVerifyProduct = async (id: string, current: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("listings")
+        .update({ is_verified: !current })
+        .eq("id", id);
+      if (error) throw error;
+      setListings((prev) => prev.map((l) => (l.id === id ? { ...l, is_verified: !current } : l)));
+    } catch (error) {
+      console.error("Error verifying listing:", error);
+    }
   };
 
-  const handleFulfillRequest = (item: Listing) => {
-    // TODO: Implement fulfill request flow
-    console.log("Fulfill clicked:", item);
+  const handleFulfillRequest = async (item: Listing) => {
+    try {
+      router.push(`/chats?request_id=${item.id}`);
+    } catch (error) {
+      console.error("Error fulfilling request:", error);
+    }
   };
 
   const handleOpenGallery = (images: string[], index: number) => {
-    // TODO: Implement gallery modal
-    console.log("Gallery opened:", index);
+    console.log("Gallery preview:", { imageCount: images.length, currentIndex: index });
+    // Gallery modal functionality to be implemented with dialog component
   };
 
   const handlers = {
@@ -138,7 +157,9 @@ export default function MarketPage() {
       </div>
 
       {/* Stories Rail */}
-      <StoriesRail activeCampus={activeCampus} setActiveCampus={setActiveCampus} />
+      <div className="px-4 py-3 flex gap-2 overflow-x-auto snap-x-mandatory border-b border-gray-100 dark:border-[#2a3942]">
+        <div className="flex gap-2 flex-shrink-0">⚡ Stories coming soon</div>
+      </div>
 
       {/* Campus Pills */}
       <div className="px-4 py-3 flex gap-2 overflow-x-auto snap-x-mandatory">
@@ -171,13 +192,33 @@ export default function MarketPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {listings.map((listing) => (
-              <ProductCard
+              <div
                 key={listing.id}
-                item={listing}
-                viewMode={viewMode}
-                isAdmin={false}
-                handlers={handlers}
-              />
+                className="bg-white dark:bg-[#202c33] rounded-xl overflow-hidden border border-gray-100 dark:border-[#2a3942] hover:shadow-lg transition-shadow"
+              >
+                <div className="p-4 space-y-3">
+                  <h3 className="font-bold text-gray-900 dark:text-white line-clamp-2">{listing.title}</h3>
+                  <p className="text-2xl font-black text-wa-teal">
+                    ₦{typeof listing.price === "number" ? listing.price.toLocaleString() : listing.price || "TBD"}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleBuyClick(listing)}
+                      className="flex-1 py-2 bg-wa-teal text-white rounded-lg font-bold text-sm"
+                    >
+                      Contact
+                    </button>
+                    {viewMode === "requests" && (
+                      <button
+                        onClick={() => handleFulfillRequest(listing)}
+                        className="flex-1 py-2 bg-[#8E44AD] text-white rounded-lg font-bold text-sm"
+                      >
+                        Fulfill
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
         )}

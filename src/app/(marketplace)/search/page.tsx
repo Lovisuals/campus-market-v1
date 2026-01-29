@@ -1,9 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { Listing } from "@/lib/types";
 
 export default function SearchPage() {
+  const supabase = createClient();
   const [searchQuery, setSearchQuery] = useState("");
+  const [results, setResults] = useState<Listing[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [filters, setFilters] = useState({
     category: "",
     minPrice: "",
@@ -21,10 +26,25 @@ export default function SearchPage() {
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement advanced search with filters
-    console.log("Search:", { searchQuery, filters });
+    setIsSearching(true);
+    try {
+      let query = supabase.from("listings").select("*").eq("is_approved", true);
+      if (filters.category) query = query.eq("category", filters.category);
+      if (filters.campus) query = query.eq("campus", filters.campus);
+      if (filters.condition) query = query.eq("condition", filters.condition);
+      if (filters.minPrice) query = query.gte("price", parseFloat(filters.minPrice));
+      if (filters.maxPrice) query = query.lte("price", parseFloat(filters.maxPrice));
+      if (searchQuery) query = query.ilike("title", `%${searchQuery}%`);
+      const { data, error } = await query;
+      if (error) throw error;
+      setResults(data || []);
+    } catch (error) {
+      console.error("Search error:", error);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   return (
