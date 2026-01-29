@@ -3,13 +3,32 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
-export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
+type Contributor = {
+  name?: string;
+  is_admin?: boolean;
+  school?: string;
+};
+
+type Story = {
+  id: string;
+  cloudinary_url?: string;
+  thumbnail_url?: string;
+  caption?: string;
+  category?: string;
+  campus?: string;
+  is_admin?: boolean;
+  contributors?: Contributor;
+  created_at?: string;
+  is_elite?: boolean;
+};
+
+export default function StoriesRail({ activeCampus, setActiveCampus }: { activeCampus: string; setActiveCampus: (c: string) => void; }) {
   const supabase = createClient();
-  const [stories, setStories] = useState<any[]>([]);
-  const [viewingStory, setViewingStory] = useState<any | null>(null);
+  const [stories, setStories] = useState<Story[]>([]);
+  const [viewingStory, setViewingStory] = useState<Story | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  
+
   const [showPostModal, setShowPostModal] = useState(false);
   const [newVideo, setNewVideo] = useState({ url: '', caption: '', category: 'general' });
 
@@ -27,63 +46,68 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
   }, [activeCampus]);
 
   const checkAdminStatus = async () => {
-    const phone = localStorage.getItem('user_phone');
-    if (phone) {
-      const { data } = await supabase.from('contributors').select('is_admin').eq('phone', phone).maybeSingle();
-      if (data?.is_admin) setIsAdmin(true);
+    try {
+      const phone = typeof window !== 'undefined' ? localStorage.getItem('user_phone') : null;
+      if (!phone) return;
+      const { data, error } = await supabase.from('contributors').select('is_admin').eq('phone', phone).maybeSingle();
+      if (!error && data?.is_admin) setIsAdmin(true);
+    } catch (e) {
+      console.error('checkAdminStatus error', e);
     }
   };
 
-  // 🔧 CORRECTED & ROBUST FETCH LOGIC
   const fetchStories = async () => {
     setLoading(true);
-    
-    // 1. Fetch videos with LEFT JOIN (contributors may be null)
-    const { data, error } = await supabase
-      .from('videos')
-      .select('*, contributors(name, is_admin, school)')
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('videos')
+        .select('*, contributors(name, is_admin, school)')
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error("❌ SQL Error:", error.message);
+      if (error) {
+        console.error('fetchStories SQL error', error);
+        setLoading(false);
+        return;
+      }
+
+      if (data && Array.isArray(data)) {
+        const processedStories = data.map((s: any) => ({
+          ...(s as Story),
+          is_elite: s.is_admin === true || s.contributors?.is_admin === true,
+        }));
+        setStories(processedStories as Story[]);
+      }
+    } catch (e) {
+      console.error('fetchStories error', e);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    if (data) {
-      console.log("📡 Data Received:", data.length, "rows");
-      
-      // 2. Determine Elite status from TWO sources (redundant & resilient)
-      const processedStories = data.map(s => ({
-        ...s,
-        is_elite: s.is_admin === true || s.contributors?.is_admin === true
-      }));
-
-      setStories(processedStories);
-    }
-
-    setLoading(false);
   };
 
   const handleSovereignPost = async () => {
-    if (!newVideo.url) return alert("Enter Cloudinary URL");
-    const phone = localStorage.getItem('user_phone') || '2348083000771';
-    
-    const { error } = await supabase.from('videos').insert([{
-      contributor_phone: phone,
-      cloudinary_url: newVideo.url,
-      thumbnail_url: newVideo.url.replace(/\.[^/.]+$/, ".jpg"),
-      caption: newVideo.caption,
-      category: newVideo.category,
-      is_admin: true,
-      campus: activeCampus === 'All' ? 'GLOBAL' : activeCampus,
-      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-    }]);
+    if (!newVideo.url) return alert('Enter Cloudinary URL');
+    try {
+      const phone = typeof window !== 'undefined' ? localStorage.getItem('user_phone') || '2348083000771' : '2348083000771';
+      const { error } = await supabase.from('videos').insert([{
+        contributor_phone: phone,
+        cloudinary_url: newVideo.url,
+        thumbnail_url: newVideo.url.replace(/\.[^/.]+$/, '.jpg'),
+        caption: newVideo.caption,
+        category: newVideo.category,
+        is_admin: true,
+        campus: activeCampus === 'All' ? 'GLOBAL' : activeCampus,
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      }]);
 
-    if (!error) {
-      setShowPostModal(false);
-      setNewVideo({ url: '', caption: '', category: 'general' });
-      fetchStories();
+      if (!error) {
+        setShowPostModal(false);
+        setNewVideo({ url: '', caption: '', category: 'general' });
+        fetchStories();
+      } else {
+        console.error('handleSovereignPost error', error);
+      }
+    } catch (e) {
+      console.error('handleSovereignPost exception', e);
     }
   };
 
@@ -96,7 +120,7 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
 
   return (
     <div className="bg-[var(--wa-chat-bg)] border-b border-[var(--border)] pt-2 pb-4">
-      {/* 📍 CAMPUS FILTERS */}
+      {/* Campus Filters */}
       <div className="flex gap-2 overflow-x-auto px-5 mb-4 scrollbar-hide no-bounce">
         {CAMPUS_PILLS.map(pill => (
           <button 
@@ -114,7 +138,7 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
       </div>
 
       <div className="flex items-start px-5 gap-4 overflow-x-auto scrollbar-hide snap-x-mandatory">
-        {/* 👑 SUPREME ADMIN PIN - ALWAYS VISIBLE */}
+        {/* Supreme Admin Pin - Always Visible */}
         <div className="flex-shrink-0 flex items-center gap-4 border-r border-[var(--border)] pr-4 min-w-[80px]">
           {eliteStories.length > 0 ? (
             eliteStories.map(story => (
@@ -126,10 +150,9 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
               />
             ))
           ) : (
-            /* 🌑 No Updates Placeholder - Persistent Section */
             <div className="flex flex-col items-center gap-1 opacity-50 group cursor-default">
               <div className="w-14 h-14 rounded-full border-2 border-dashed border-yellow-600/40 flex items-center justify-center bg-yellow-500/10 backdrop-blur-sm">
-                <span className="text-2xl group-hover:scale-110 transition-transform">👑</span>
+                <span className="text-2xl group-hover:scale-110 transition-transform"></span>
               </div>
               <span className="text-[7px] font-black uppercase tracking-widest text-yellow-700">
                 No Updates
@@ -138,7 +161,7 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
           )}
         </div>
 
-        {/* ➕ DYNAMIC PORTAL */}
+        {/* Dynamic Portal */}
         <div 
           onClick={() => isAdmin 
             ? setShowPostModal(true) 
@@ -149,14 +172,14 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
           <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl shadow-lg border-2 border-white transition-all
             ${isAdmin ? 'bg-yellow-500 scale-110 shadow-yellow-500/40' : 'bg-blue-600'}`}
           >
-            {isAdmin ? '👑' : '+'}
+            {isAdmin ? '' : '+'}
           </div>
           <span className={`text-[8px] font-black uppercase text-center ${isAdmin ? 'text-yellow-600' : 'text-blue-600'}`}>
             {isAdmin ? 'Post Elite' : 'Add Story'}
           </span>
         </div>
 
-        {/* 👤 USER STORIES */}
+        {/* User Stories */}
         {loading ? (
           <div className="w-14 h-14 rounded-full bg-gray-200 animate-pulse" />
         ) : (
@@ -170,11 +193,11 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
         )}
       </div>
 
-      {/* 👑 ADMIN POST MODAL */}
+      {/* Admin Post Modal */}
       {showPostModal && (
         <div className="fixed inset-0 z-[2000] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
           <div className="bg-[var(--surface)] w-full max-w-sm rounded-[32px] p-8 border border-[var(--border)] shadow-2xl animate-scale-up">
-            <h2 className="text-lg font-black mb-6 flex items-center gap-2">👑 SUPREME UPLOAD</h2>
+            <h2 className="text-lg font-black mb-6 flex items-center gap-2">SUPREME UPLOAD</h2>
             <input 
               type="text" 
               placeholder="Cloudinary Video URL" 
@@ -220,7 +243,7 @@ export default function StoriesRail({ activeCampus, setActiveCampus }: any) {
         </div>
       )}
 
-      {/* 📺 STORY VIEWER */}
+      {/* Story Viewer */}
       {viewingStory && (
         <div className="fixed inset-0 z-[1000] bg-black animate-fade-in flex flex-col">
           <div className="absolute top-0 w-full h-1 bg-white/20 z-[1001]">

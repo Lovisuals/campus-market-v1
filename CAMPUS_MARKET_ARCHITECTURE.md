@@ -702,7 +702,7 @@ const presenceChannel = supabase
     const state = presenceChannel.presenceState()
     const typingUsers = Object.values(state)
       .flat()
-      .filter((u: any) => u.typing && u.user_id !== currentUserId)
+      .filter((u: { typing: boolean; user_id: string }) => u.typing && u.user_id !== currentUserId)
     
     setTypingUsers(typingUsers)
   })
@@ -1436,7 +1436,7 @@ import { createClient } from '@supabase/supabase-js'
 
 describe('Listings API', () => {
   let supabase: ReturnType<typeof createClient>
-  let testUser: any
+  let testUser: { email: string; password: string }
 
   beforeAll(async () => {
     supabase = createClient(
@@ -1649,7 +1649,7 @@ export function useListings(universityId: string) {
 import { Redis } from '@upstash/redis'
 
 const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_URL!,
+  url: process.env.UPSTASH_REDIS_URL
   token: process.env.UPSTASH_REDIS_TOKEN!,
 })
 
