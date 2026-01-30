@@ -16,14 +16,25 @@ export default function LoginPage() {
     setError(null);
 
     try {
+      // Validate and normalize phone number
+      const phoneValidation = validateAndNormalizePhone(phoneNumber, 'NG');
+
+      if (!phoneValidation.valid) {
+        setError(phoneValidation.error || 'Invalid phone number format');
+        setIsLoading(false);
+        return;
+      }
+
+      const normalizedPhone = phoneValidation.normalized;
+
       const { error } = await supabase.auth.signInWithOtp({
-        phone: phoneNumber,
+        phone: normalizedPhone,
       });
 
       if (error) throw error;
 
-      // Redirect to verify page
-      window.location.href = `/verify?phone=${encodeURIComponent(phoneNumber)}`;
+      // Redirect to verify page with normalized phone
+      window.location.href = `/verify?phone=${encodeURIComponent(normalizedPhone)}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
