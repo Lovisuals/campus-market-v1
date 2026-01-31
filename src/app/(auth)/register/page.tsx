@@ -4,23 +4,19 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { normalizePhoneNumber, getOperator } from "@/lib/phone-validator";
 
 export default function RegisterPage() {
   const router = useRouter();
   const supabase = createClient();
   const [step, setStep] = useState(1); // 1: Info, 2: Campus
   const [formData, setFormData] = useState({
-    phone_number: "",
-    full_name: "",
     email: "",
+    full_name: "",
+    phone: "",
     campus: "",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [phoneError, setPhoneError] = useState<string | null>(null);
-  const [phoneFormatted, setPhoneFormatted] = useState<string>("");
-  const [phoneOperator, setPhoneOperator] = useState<string>("");
 
   const campuses = [
     "UNILAG",
@@ -37,42 +33,12 @@ export default function RegisterPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-
-    // Validate phone number in real-time
-    if (name === "phone_number") {
-      if (value.length > 5) {
-        const validation = normalizePhoneNumber(value, "NG");
-        if (validation.valid) {
-          setPhoneError(null);
-          setPhoneFormatted(validation.formatted);
-          const operator = getOperator(value);
-          if (operator) {
-            setPhoneOperator(operator);
-          }
-        } else {
-          setPhoneError(validation.error || "Invalid phone number");
-          setPhoneFormatted("");
-          setPhoneOperator("");
-        }
-      } else {
-        setPhoneError(null);
-        setPhoneFormatted("");
-        setPhoneOperator("");
-      }
-    }
   };
 
   const handleNextStep = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate phone number before proceeding
-    const phoneValidation = normalizePhoneNumber(formData.phone_number, "NG");
-    if (!phoneValidation.valid) {
-      setPhoneError(phoneValidation.error || "Invalid phone number");
-      return;
-    }
-
-    if (step === 1 && formData.phone_number && formData.full_name) {
+    if (step === 1 && formData.email && formData.full_name) {
       setStep(2);
     }
   };
@@ -83,31 +49,42 @@ export default function RegisterPage() {
     setError(null);
 
     try {
-      // Validate phone number
-      const phoneValidation = normalizePhoneNumber(formData.phone_number, "NG");
-      if (!phoneValidation.valid) {
-        setPhoneError(phoneValidation.error || "Invalid phone number");
-        setIsLoading(false);
-        return;
-      }
-
-      const normalizedPhone = phoneValidation.normalized;
-
-      // Send OTP
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        phone: normalizedPhone,
+      // Sign up with Supabase
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: crypto.randomUUID(), // Generate random password (user won't need it)
+        options: {
+          data: {
+            full_name: formData.full_name,
+            campus: formData.campus,
+            phone: formData.phone,
+          },
+          emailRedirectTo: `${window.location.origin}/market`,
+        }
       });
 
-      if (otpError) throw otpError;
+      if (signUpError) throw signUpError;
 
-      // Store registration data in session with normalized phone
-      sessionStorage.setItem("registrationData", JSON.stringify({
-        ...formData,
-        phone_number: normalizedPhone,
-      }));
+      if (data.user) {
+        // Create user record
+        const { error: insertError } = await supabase.from("users").insert([
+          {
+            id: data.user.id,
+            email: formData.email,
+            full_name: formData.full_name,
+            campus: formData.campus,
+            phone: formData.phone,
+            is_admin: false,
+          },
+        ]);
 
-      // Redirect to verify page
-      router.push(`/verify?phone=${encodeURIComponent(normalizedPhone)}&register=true`);
+        if (insertError && insertError.code !== '23505') { // Ignore duplicate key error
+          console.error('Error creating user record:', insertError);
+        }
+      }
+
+      // Show success message
+      router.push(`/login?registered=true`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -170,51 +147,34 @@ export default function RegisterPage() {
                   />
                 </div>
 
-                {/* Phone Number */}
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-3">
-                    📱 Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone_number"
-                    value={formData.phone_number}
-                    onChange={handleChange}
-                    placeholder="+234 801 234 5678"
-                    className={`w-full px-4 py-3 border-2 rounded-2xl focus:ring-2 focus:border-transparent outline-none transition-all text-lg ${
-                      phoneError
-                        ? "border-red-500 focus:ring-red-500"
-                        : formData.phone_number && !phoneError
-                        ? "border-green-500 focus:ring-green-500"
-                        : "border-gray-200 focus:ring-wa-teal"
-                    }`}
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-2">We'll send you a verification code</p>
-                  {phoneFormatted && !phoneError && (
-                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
-                      <p className="text-xs text-green-700">✓ {phoneFormatted}</p>
-                      {phoneOperator && (
-                        <p className="text-xs text-green-600 mt-1">Operator: {phoneOperator}</p>
-                      )}
-                    </div>
-                  )}
-                  {phoneError && (
-                    <p className="text-xs text-red-600 mt-2">❌ {phoneError}</p>
-                  )}
-                </div>
-
                 {/* Email */}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-3">
-                    📧 Email (Optional)
+                    📧 Email Address
                   </label>
                   <input
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder="you@email.com"
+                    placeholder="you@campus.edu"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-wa-teal focus:border-transparent outline-none transition-all text-lg"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-2">We'll send a confirmation link</p>
+                </div>
+
+                {/* Phone (Optional) */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-3">
+                    📱 Phone Number (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    placeholder="+234 801 234 5678"
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-wa-teal focus:border-transparent outline-none transition-all text-lg"
                   />
                 </div>

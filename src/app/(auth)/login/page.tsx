@@ -3,13 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { validateAndNormalizePhone } from "@/lib/phone-validator";
 
 export default function LoginPage() {
   const supabase = createClient();
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [otpSent, setOtpSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,25 +17,17 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      // Validate and normalize phone number
-      const phoneValidation = validateAndNormalizePhone(phoneNumber, 'NG');
-
-      if (!phoneValidation.valid) {
-        setError(phoneValidation.error || 'Invalid phone number format');
-        setIsLoading(false);
-        return;
-      }
-
-      const normalizedPhone = phoneValidation.normalized;
-
+      // Use Supabase's built-in email OTP (no external service needed)
       const { error } = await supabase.auth.signInWithOtp({
-        phone: normalizedPhone,
+        email: email,
+        options: {
+          shouldCreateUser: false, // Don't create user, login only
+        }
       });
 
       if (error) throw error;
 
-      // Redirect to verify page with normalized phone
-      window.location.href = `/verify?phone=${encodeURIComponent(normalizedPhone)}`;
+      setOtpSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -57,43 +49,70 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl p-6 sm:p-8 space-y-5 sm:space-y-6">
-          {/* Title */}
-          <div className="text-center">
-            <h2 className="text-xl sm:text-2xl font-black text-gray-900 mb-2">Welcome back</h2>
-            <p className="text-gray-600 text-sm">Sign in with your phone number to continue</p>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-3">
-                📱 Phone Number
-              </label>
-              <input
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="+234 801 234 5678"
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-wa-teal focus:border-transparent outline-none transition-all text-lg"
-                required
-              />
-              <p className="text-xs text-gray-500 mt-2">We'll send you a verification code</p>
-            </div>
-
-            {error && (
-              <div className="p-4 bg-red-50 border-2 border-red-200 rounded-2xl">
-                <p className="text-red-700 text-sm font-semibold">❌ {error}</p>
+          {otpSent ? (
+            /* OTP Sent Success */
+            <div className="text-center space-y-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+                <span className="text-3xl">✅</span>
               </div>
-            )}
+              <h2 className="text-xl sm:text-2xl font-black text-gray-900">Check your email!</h2>
+              <p className="text-gray-600 text-sm">
+                We've sent a magic link to <strong>{email}</strong>
+              </p>
+              <p className="text-gray-500 text-xs">
+                Click the link in your email to sign in. The link will expire in 1 hour.
+              </p>
+              <button
+                onClick={() => {
+                  setOtpSent(false);
+                  setEmail("");
+                }}
+                className="text-wa-teal font-bold text-sm hover:underline"
+              >
+                Use different email
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Title */}
+              <div className="text-center">
+                <h2 className="text-xl sm:text-2xl font-black text-gray-900 mb-2">Welcome back</h2>
+                <p className="text-gray-600 text-sm">Sign in with your email to continue</p>
+              </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3 bg-gradient-to-r from-wa-teal to-[#006d59] text-white font-black rounded-2xl hover:shadow-lg transition-all disabled:opacity-50 text-lg"
-            >
-              {isLoading ? "Sending..." : "Get OTP"}
-            </button>
-          </form>
+              {/* Form */}
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-3">
+                    📧 Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@campus.edu"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-wa-teal focus:border-transparent outline-none transition-all text-lg"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-2">We'll send you a magic link to sign in</p>
+                </div>
+
+                {error && (
+                  <div className="p-4 bg-red-50 border-2 border-red-200 rounded-2xl">
+                    <p className="text-red-700 text-sm font-semibold">❌ {error}</p>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-3 bg-gradient-to-r from-wa-teal to-[#006d59] text-white font-black rounded-2xl hover:shadow-lg transition-all disabled:opacity-50 text-lg"
+                >
+                  {isLoading ? "Sending..." : "Send Magic Link"}
+                </button>
+              </form>
+            </>
+          )}
 
           {/* Divider */}
           <div className="flex items-center gap-3">
