@@ -163,26 +163,26 @@ EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;
 
--- Listings table constraints
+-- Listings/Posts table constraints
 DO $$ 
 BEGIN
-    ALTER TABLE listings ADD CONSTRAINT check_price_positive 
-      CHECK (price IS NULL OR price > 0);
+    ALTER TABLE posts ADD CONSTRAINT check_price_positive 
+      CHECK (price > 0);
 EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ 
 BEGIN
-    ALTER TABLE listings ADD CONSTRAINT check_price_max 
-      CHECK (price IS NULL OR price <= 100000000);
+    ALTER TABLE posts ADD CONSTRAINT check_price_max 
+      CHECK (price <= 100000000);
 EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ 
 BEGIN
-    ALTER TABLE listings ADD CONSTRAINT check_title_length 
+    ALTER TABLE posts ADD CONSTRAINT check_title_length 
       CHECK (char_length(title) >= 5 AND char_length(title) <= 200);
 EXCEPTION
     WHEN duplicate_object THEN NULL;
@@ -190,8 +190,8 @@ END $$;
 
 DO $$ 
 BEGIN
-    ALTER TABLE listings ADD CONSTRAINT check_description_length 
-      CHECK (char_length(description) >= 20 AND char_length(description) <= 5000);
+    ALTER TABLE posts ADD CONSTRAINT check_description_length 
+      CHECK (description IS NULL OR char_length(description) >= 20 AND char_length(description) <= 5000);
 EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;
@@ -234,7 +234,7 @@ END $$;
 -- ============================================================================
 
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE listings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
@@ -249,20 +249,20 @@ CREATE POLICY "Users can update own profile"
   ON users FOR UPDATE
   USING (auth.uid() = id);
 
--- Listings RLS Policies
-DROP POLICY IF EXISTS "Anyone can view approved listings" ON listings;
-CREATE POLICY "Anyone can view approved listings"
-  ON listings FOR SELECT
-  USING (is_approved = true OR seller_id = auth.uid());
+-- Posts/Listings RLS Policies
+DROP POLICY IF EXISTS "Public can view approved posts" ON posts;
+CREATE POLICY "Public can view approved posts"
+  ON posts FOR SELECT
+  USING (status = 'approved' OR auth.uid() = seller_id);
 
-DROP POLICY IF EXISTS "Sellers can create listings" ON listings;
-CREATE POLICY "Sellers can create listings"
-  ON listings FOR INSERT
+DROP POLICY IF EXISTS "Sellers can create posts" ON posts;
+CREATE POLICY "Sellers can create posts"
+  ON posts FOR INSERT
   WITH CHECK (auth.uid() = seller_id);
 
-DROP POLICY IF EXISTS "Sellers can update own listings" ON listings;
-CREATE POLICY "Sellers can update own listings"
-  ON listings FOR UPDATE
+DROP POLICY IF EXISTS "Sellers can update own posts" ON posts;
+CREATE POLICY "Sellers can update own posts"
+  ON posts FOR UPDATE
   USING (auth.uid() = seller_id);
 
 -- Transactions RLS Policies
@@ -303,7 +303,7 @@ SELECT
   CASE WHEN rowsecurity THEN '✅ ENABLED' ELSE '❌ DISABLED' END as rls_status
 FROM pg_tables 
 WHERE schemaname = 'public' 
-AND tablename IN ('users', 'listings', 'transactions', 'messages', 'otp_sessions', 'trusted_devices', 'audit_logs')
+AND tablename IN ('users', 'posts', 'transactions', 'messages', 'otp_sessions', 'trusted_devices', 'audit_logs')
 ORDER BY tablename;
 
 -- Check constraints exist (should show multiple constraints)
@@ -316,7 +316,7 @@ SELECT
     WHEN 'u' THEN 'UNIQUE'
   END as constraint_type
 FROM pg_constraint 
-WHERE conrelid IN ('users'::regclass, 'listings'::regclass, 'transactions'::regclass)
+WHERE conrelid IN ('users'::regclass, 'posts'::regclass, 'transactions'::regclass)
 ORDER BY conrelid::text, conname;
 
 -- Check new tables exist (should show 3 tables)
