@@ -16,27 +16,23 @@
 UPDATE users
 SET 
   is_admin = true,
-  is_verified = true,
   phone_verified = true,
   updated_at = NOW()
-WHERE email = 'admin@campusmarketp2p.com.ng';
+WHERE email = 'mail.lovisuals@gmail.com';
 
 -- Option 2: If user doesn't exist in users table yet, insert them
--- (Replace 'YOUR_USER_UUID_HERE' with actual UUID from auth.users)
-INSERT INTO users (id, email, full_name, campus, is_admin, is_verified, phone_verified)
+INSERT INTO users (id, email, full_name, campus, is_admin, phone_verified)
 VALUES (
-  'YOUR_USER_UUID_HERE',  -- Get this from Authentication > Users
-  'admin@campusmarketp2p.com.ng',
+  '6bc89d9b-1f32-4164-8dff-a89a05442b52',
+  'mail.lovisuals@gmail.com',
   'Campus Market Admin',
   'Admin Campus',
-  true,
   true,
   true
 )
 ON CONFLICT (id) DO UPDATE
 SET 
   is_admin = true,
-  is_verified = true,
   phone_verified = true;
 
 -- Verify admin was created
@@ -45,7 +41,6 @@ SELECT
   email,
   full_name,
   is_admin,
-  is_verified,
   phone_verified,
   created_at
 FROM users

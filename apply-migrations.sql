@@ -48,11 +48,11 @@ CREATE TRIGGER sync_phone_verified_trigger
   AFTER INSERT OR UPDATE OF phone_confirmed_at ON auth.users
   FOR EACH ROW EXECUTE FUNCTION sync_phone_verified();
 
--- Populate existing users
-UPDATE users
-SET phone_verified = (auth.users.phone_confirmed_at IS NOT NULL)
-FROM auth.users
-WHERE users.id = auth.users.id;
+-- Populate existing users (with table alias to avoid ambiguity)
+UPDATE users u
+SET phone_verified = (au.phone_confirmed_at IS NOT NULL)
+FROM auth.users au
+WHERE u.id = au.id;
 
 -- =====================================================
 -- 3. LISTINGS (20260129_complete_schema.sql)
@@ -332,6 +332,41 @@ ALTER TABLE chats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (to allow re-running script)
+DROP POLICY IF EXISTS "Users are viewable by everyone" ON users;
+DROP POLICY IF EXISTS "Users can update own profile" ON users;
+DROP POLICY IF EXISTS "Users can insert own profile" ON users;
+DROP POLICY IF EXISTS "Public can view listings" ON listings;
+DROP POLICY IF EXISTS "Sellers can create listings" ON listings;
+DROP POLICY IF EXISTS "Sellers can update own listings" ON listings;
+DROP POLICY IF EXISTS "Sellers can delete own listings" ON listings;
+DROP POLICY IF EXISTS "Admins can delete any listing" ON listings;
+DROP POLICY IF EXISTS "Sellers can view own requests" ON verification_requests;
+DROP POLICY IF EXISTS "Sellers can create requests" ON verification_requests;
+DROP POLICY IF EXISTS "Admins can update requests" ON verification_requests;
+DROP POLICY IF EXISTS "Users can only view their own OTP sessions" ON otp_sessions;
+DROP POLICY IF EXISTS "System can manage OTP sessions" ON otp_sessions;
+DROP POLICY IF EXISTS "Public can view approved posts" ON posts;
+DROP POLICY IF EXISTS "Sellers can create posts" ON posts;
+DROP POLICY IF EXISTS "Sellers can update own posts" ON posts;
+DROP POLICY IF EXISTS "Admins can manage posts" ON posts;
+DROP POLICY IF EXISTS "Admins can view all approvals" ON approval_queue;
+DROP POLICY IF EXISTS "Admins can manage approvals" ON approval_queue;
+DROP POLICY IF EXISTS "Users can view own transactions" ON transactions;
+DROP POLICY IF EXISTS "System can create transactions" ON transactions;
+DROP POLICY IF EXISTS "System can update transactions" ON transactions;
+DROP POLICY IF EXISTS "Admins can view all escrow" ON escrow_accounts;
+DROP POLICY IF EXISTS "System can manage escrow" ON escrow_accounts;
+DROP POLICY IF EXISTS "Involved parties and admins can view disputes" ON disputes;
+DROP POLICY IF EXISTS "Sellers can view own payouts" ON payouts;
+DROP POLICY IF EXISTS "Users can view their chats" ON chats;
+DROP POLICY IF EXISTS "Users can create chats" ON chats;
+DROP POLICY IF EXISTS "Users can update their chats" ON chats;
+DROP POLICY IF EXISTS "Chat participants can view messages" ON messages;
+DROP POLICY IF EXISTS "Users can create messages" ON messages;
+DROP POLICY IF EXISTS "Users can update their messages" ON messages;
+DROP POLICY IF EXISTS "Admins can view audit logs" ON audit_log;
+
 -- Users policies
 CREATE POLICY "Users are viewable by everyone" ON users FOR SELECT USING (true);
 CREATE POLICY "Users can update own profile" ON users FOR UPDATE USING (auth.uid() = id);
@@ -357,7 +392,7 @@ CREATE POLICY "Admins can update requests" ON verification_requests FOR UPDATE U
 
 -- OTP sessions policies
 CREATE POLICY "Users can only view their own OTP sessions" ON otp_sessions FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "System can manage OTP sessions" ON otp_sessions FOR ALL USING (true);
+CREATE POLICY "System can manage OTP sessions" ON otp_sessions FOR ALL USING (true) WITH CHECK (true);
 
 -- Posts policies
 CREATE POLICY "Public can view approved posts" ON posts FOR SELECT
@@ -366,19 +401,21 @@ CREATE POLICY "Public can view approved posts" ON posts FOR SELECT
 CREATE POLICY "Sellers can create posts" ON posts FOR INSERT WITH CHECK (auth.uid() = seller_id);
 CREATE POLICY "Sellers can update own posts" ON posts FOR UPDATE USING (auth.uid() = seller_id);
 CREATE POLICY "Admins can manage posts" ON posts FOR ALL
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
+  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true))
+  WITH CHECK (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
 
 -- Approval queue policies
 CREATE POLICY "Admins can view all approvals" ON approval_queue FOR SELECT
   USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
 CREATE POLICY "Admins can manage approvals" ON approval_queue FOR ALL
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
+  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true))
+  WITH CHECK (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
 
 -- Transactions policies
 CREATE POLICY "Users can view own transactions" ON transactions FOR SELECT
   USING (auth.uid() = buyer_id OR auth.uid() = seller_id OR
          EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
-CREATE POLICY "System can create transactions" ON transactions FOR INSERT USING (true);
+CREATE POLICY "System can create transactions" ON transactions FOR INSERT WITH CHECK (true);
 CREATE POLICY "System can update transactions" ON transactions FOR UPDATE
   USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
 
@@ -386,7 +423,8 @@ CREATE POLICY "System can update transactions" ON transactions FOR UPDATE
 CREATE POLICY "Admins can view all escrow" ON escrow_accounts FOR SELECT
   USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
 CREATE POLICY "System can manage escrow" ON escrow_accounts FOR ALL
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
+  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true))
+  WITH CHECK (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true));
 
 -- Disputes policies
 CREATE POLICY "Involved parties and admins can view disputes" ON disputes FOR SELECT
