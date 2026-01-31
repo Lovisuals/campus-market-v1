@@ -31,10 +31,10 @@ export async function POST(req: Request) {
     // Validate input
     const validation = validateSchema(SendMessageSchema, body);
     if (!validation.success) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
+      return NextResponse.json({ error: (validation as { success: false; error: string }).error }, { status: 400 });
     }
 
-    const { recipient_id, content, listing_id } = validation.data;
+    const { recipient_id, content, listing_id } = (validation as { success: true; data: any }).data;
 
     // Prevent self-messaging
     if (recipient_id === user.id) {

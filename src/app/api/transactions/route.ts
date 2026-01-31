@@ -30,10 +30,10 @@ export async function POST(req: Request) {
     // Validate input
     const validation = validateSchema(CreateTransactionSchema, body);
     if (!validation.success) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
+      return NextResponse.json({ error: (validation as { success: false; error: string }).error }, { status: 400 });
     }
 
-    const { listing_id, amount, payment_method } = validation.data;
+    const { listing_id, amount, payment_method } = (validation as { success: true; data: any }).data;
 
     // Verify listing exists and is available
     const { data: listing, error: listingError } = await supabase
@@ -112,12 +112,7 @@ export async function PATCH(req: Request) {
     // Validate input
     const validation = validateSchema(UpdateTransactionStatusSchema, body);
     if (!validation.success) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
-    }
-
-    const { transaction_id, status, notes } = validation.data;
-
-    // Get transaction details
+      return NextResponse.json({ error: (validation as { success: false; error: string }).error }, { status: 400 });
     const { data: transaction, error: txError } = await supabase
       .from('transactions')
       .select('*, listing:listings(*)')

@@ -28,10 +28,10 @@ export async function POST(req: Request) {
     // Validate input
     const validation = validateSchema(CreateReportSchema, body);
     if (!validation.success) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
+      return NextResponse.json({ error: (validation as { success: false; error: string }).error }, { status: 400 });
     }
 
-    const { reported_user_id, listing_id, reason, description } = validation.data;
+    const { reported_user_id, listing_id, reason, description } = (validation as { success: true; data: any }).data;
 
     // Verify at least one target is provided
     if (!reported_user_id && !listing_id) {

@@ -19,10 +19,10 @@ export async function POST(req: Request) {
     // Validate input
     const validation = validateSchema(CreateReviewSchema, body);
     if (!validation.success) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
+      return NextResponse.json({ error: (validation as { success: false; error: string }).error }, { status: 400 });
     }
 
-    const { seller_id, transaction_id, rating, comment } = validation.data;
+    const { seller_id, transaction_id, rating, comment } = (validation as { success: true; data: any }).data;
 
     // Verify transaction exists and user is the buyer
     const { data: transaction, error: txError } = await supabase
