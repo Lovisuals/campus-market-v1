@@ -195,16 +195,24 @@ END $$;
 -- Transactions table constraints
 DO $$ 
 BEGIN
-    ALTER TABLE transactions ADD CONSTRAINT check_base_price_positive 
-      CHECK (base_price > 0);
+    ALTER TABLE transactions ADD CONSTRAINT check_amount_positive 
+      CHECK (amount > 0);
 EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ 
 BEGIN
-    ALTER TABLE transactions ADD CONSTRAINT check_commission_non_negative 
-      CHECK (commission_fee >= 0);
+    ALTER TABLE transactions ADD CONSTRAINT check_admin_fee_non_negative 
+      CHECK (admin_fee >= 0);
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ 
+BEGIN
+    ALTER TABLE transactions ADD CONSTRAINT check_seller_amount_matches 
+      CHECK (seller_amount = amount - admin_fee);
 EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;
