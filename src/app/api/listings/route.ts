@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     const validation = validateSchema(CreateListingSchema, body);
     if (!validation.success) {
       return addSecurityHeaders(
-        NextResponse.json({ error: validation.error }, { status: 400 })
+        NextResponse.json({ error: (validation as { success: false; error: string }).error }, { status: 400 })
       );
     }
     
