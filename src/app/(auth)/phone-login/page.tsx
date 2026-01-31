@@ -45,7 +45,44 @@ export default function PhoneLoginPage() {
 
       setUserId(userData.id);
 
-      // Generate OTP
+      // Get current device fingerprint and IP
+      const deviceHash = await hashString(navigator.userAgent);
+      const ipHash = await getIPHash();
+
+      // Check if this device/IP combination is recognized
+      const { data: deviceData, error: deviceError } = await supabase
+        .from("user_devices")
+        .select("*")
+        .eq("user_id", userData.id)
+        .eq("device_hash", deviceHash)
+        .eq("ip_hash", ipHash)
+        .single();
+
+      // If device is recognized, log in directly without OTP
+      if (deviceData && !deviceError) {
+        // Update last used time
+        await supabase
+          .from("user_devices")
+          .update({ last_used_at: new Date().toISOString() })
+          .eq("id", deviceData.id);
+
+        // Sign in user directly
+        const { error: signInError } = await supabase.auth.signInWithOtp({
+          email: userData.email,
+          options: {
+            shouldCreateUser: false,
+            emailRedirectTo: `${window.location.origin}/api/auth/callback`,
+          }
+        });
+
+        if (signInError) throw signInError;
+
+        alert(`✅ Recognized device! Check your email (${userData.email}) for the login link.`);
+        setIsLoading(false);
+        return;
+      }
+
+      // Device/IP not recognized - send OTP
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
       
       // Store OTP in database
@@ -56,8 +93,8 @@ export default function PhoneLoginPage() {
           code: otpCode,
           expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
           attempts: 0,
-          device_hash: await hashString(navigator.userAgent),
-          ip_hash: await getIPHash(),
+          device_hash: deviceHash,
+          ip_hash: ipHash,
           used: false,
         });
 
@@ -110,28 +147,62 @@ export default function PhoneLoginPage() {
 
       if (updateError) throw updateError;
 
-      // Get user data
+      // Save this device/IP for future logins
       const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("phone")
+        .eq("id", userId)
+        .single();
+
+      if (!userError && userData) {
+        const deviceHash = await hashString(navigator.userAgent);
+        const ipHash = await getIPHash();
+
+        // Check if device already exists
+        const { data: existingDevice } = await supabase
+          .from("user_devices")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("device_hash", deviceHash)
+          .eq("ip_hash", ipHash)
+          .single();
+
+        if (!existingDevice) {
+          // Add new trusted device
+          await supabase
+            .from("user_devices")
+            .insert({
+              user_id: userId,
+              ip_hash: ipHash,
+              phone: userData.phone,
+              device_hash: deviceHash,
+              last_used_at: new Date().toISOString(),
+            });
+        }
+      }
+
+      // Get user email for final authentication
+      const { data: userEmailData, error: emailError } = await supabase
         .from("users")
         .select("email")
         .eq("id", userId)
         .single();
 
-      if (userError || !userData?.email) throw new Error("User not found");
+      if (emailError || !userEmailData?.email) throw new Error("User not found");
 
       // Send magic link for final authentication
       const { error: magicLinkError } = await supabase.auth.signInWithOtp({
-        email: userData.email,
+        email: userEmailData.email,
         options: {
           shouldCreateUser: false,
-          emailRedirectTo: `${window.location.origin}/market`,
+          emailRedirectTo: `${window.location.origin}/api/auth/callback`,
         }
       });
 
       if (magicLinkError) throw magicLinkError;
 
       // Show success message
-      alert(`✅ OTP Verified! Check your email (${userData.email}) for the login link.`);
+      alert(`✅ Device verified! Check your email (${userEmailData.email}) for the login link. Next time you can login directly from this device.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed");
     } finally {
@@ -148,7 +219,7 @@ export default function PhoneLoginPage() {
             <span className="text-4xl">📱</span>
           </div>
           <h1 className="text-3xl font-black text-white mb-2">Phone Login</h1>
-          <p className="text-white/80 text-sm">Quick access with your phone number</p>
+          <p className="text-white/80 text-sm">Quick access - OTP only for new devices</p>
         </div>
 
         {/* Card */}
@@ -157,7 +228,7 @@ export default function PhoneLoginPage() {
             <>
               <div className="text-center">
                 <h2 className="text-xl sm:text-2xl font-black text-gray-900 mb-2">Enter Your Number</h2>
-                <p className="text-gray-600 text-sm">We'll send you a verification code</p>
+                <p className="text-gray-600 text-sm">We'll verify your device automatically</p>
               </div>
 
               <form onSubmit={handleSendOTP} className="space-y-4">
