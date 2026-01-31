@@ -44,6 +44,9 @@ export async function POST(req: Request) {
       condition,
       images,
     } = validation.data;
+    
+    // Default to selling (not a request to buy)
+    const isRequest = false;
 
     const supabase = await createServerClient();
 
