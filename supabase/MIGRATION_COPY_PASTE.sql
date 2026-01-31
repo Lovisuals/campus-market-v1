@@ -282,15 +282,28 @@ CREATE POLICY "Transaction parties can update"
   USING (auth.uid() = buyer_id OR auth.uid() = seller_id);
 
 -- Messages RLS Policies
-DROP POLICY IF EXISTS "Users can view own messages" ON messages;
-CREATE POLICY "Users can view own messages"
+DROP POLICY IF EXISTS "Users can view messages in their chats" ON messages;
+CREATE POLICY "Users can view messages in their chats"
   ON messages FOR SELECT
-  USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+  USING (
+    EXISTS (
+      SELECT 1 FROM chats
+      WHERE chats.id = messages.chat_id
+      AND (chats.buyer_id = auth.uid() OR chats.seller_id = auth.uid())
+    )
+  );
 
-DROP POLICY IF EXISTS "Users can send messages" ON messages;
-CREATE POLICY "Users can send messages"
+DROP POLICY IF EXISTS "Users can send messages in their chats" ON messages;
+CREATE POLICY "Users can send messages in their chats"
   ON messages FOR INSERT
-  WITH CHECK (auth.uid() = sender_id);
+  WITH CHECK (
+    auth.uid() = sender_id
+    AND EXISTS (
+      SELECT 1 FROM chats
+      WHERE chats.id = messages.chat_id
+      AND (chats.buyer_id = auth.uid() OR chats.seller_id = auth.uid())
+    )
+  );
 
 -- ============================================================================
 -- VERIFICATION QUERIES - Check everything worked
