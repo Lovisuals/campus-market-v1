@@ -59,22 +59,23 @@ export default function RegisterPage() {
             campus: formData.campus,
             phone: formData.phone,
           },
-          emailRedirectTo: `${window.location.origin}/market`,
+          emailRedirectTo: `${window.location.origin}/complete-profile`,
         }
       });
 
       if (signUpError) throw signUpError;
 
       if (data.user) {
-        // Create user record
+        // Create user record (phone will be added in complete-profile)
         const { error: insertError } = await supabase.from("users").insert([
           {
             id: data.user.id,
             email: formData.email,
             full_name: formData.full_name,
             campus: formData.campus,
-            phone: formData.phone,
+            phone: formData.phone || null,
             is_admin: false,
+            phone_verified: false,
           },
         ]);
 

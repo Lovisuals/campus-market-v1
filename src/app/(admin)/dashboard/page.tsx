@@ -25,6 +25,17 @@ interface VerificationRequest {
   created_at: string;
 }
 
+interface User {
+  id: string;
+  email: string;
+  phone: string | null;
+  full_name: string | null;
+  campus: string | null;
+  phone_verified: boolean;
+  is_admin: boolean;
+  created_at: string;
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   const supabase = createClient();
@@ -36,10 +47,11 @@ export default function AdminDashboard() {
   });
   const [listings, setListings] = useState<AdminListing[]>([]);
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"posts" | "verifications">("posts");
+  const [activeTab, setActiveTab] = useState<"posts" | "verifications" | "users">("posts");
 
   useEffect(() => {
     const checkAdminAndFetch = async () => {
@@ -87,9 +99,14 @@ export default function AdminDashboard() {
         }
 
         // Fetch user count
-        const { count: userCount, error: countError } = await supabase
+        const { data: allUsers, count: userCount, error: countError } = await supabase
           .from("users")
-          .select("*", { count: "exact" });
+          .select("id, email, phone, full_name, campus, phone_verified, is_admin, created_at", { count: "exact" })
+          .order("created_at", { ascending: false });
+
+        if (!countError && allUsers) {
+          setUsers(allUsers);
+        }
 
         // Calculate stats
         const verified = (allListings || []).filter((l) => l.is_verified).length;
@@ -164,10 +181,36 @@ export default function AdminDashboard() {
   };
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleSyncToSheets = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch('/api/admin/sync-sheets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to sync');
+      }
+
+      showToast(`✓ Successfully synced ${data.count} users to Google Sheets`, 'success');
+    } catch (error: any) {
+      console.error('Error syncing to sheets:', error);
+      showToast(`✕ ${error.message}`, 'error');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleDeletePost = async (id: string) => {
@@ -256,13 +299,38 @@ export default function AdminDashboard() {
             <p className="text-sm text-gray-600 dark:text-gray-400">Unverified</p>
           </div>
           <div className="p-6 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-            <p className="text-3xl font-black text-purple-600">⚙️</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Admin Mode</p>
+            <p className="text-3xl font-black text-purple-600">{stats.totalUsers}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Total Users</p>
           </div>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setActiveTab("posts")}
+            className={`px-6 py-2 rounded-lg font-bold transition-colors ${
+              activeTab === "posts"
+                ? "bg-wa-teal text-white"
+                : "bg-gray-100 dark:bg-[#202c33] text-gray-600 dark:text-gray-400 hover:bg-gray-200"
+            }`}
+          >
+            📋 Posts
+          </button>
+          <button
+            onClick={() => setActiveTab("users")}
+            className={`px-6 py-2 rounded-lg font-bold transition-colors ${
+              activeTab === "users"
+                ? "bg-wa-teal text-white"
+                : "bg-gray-100 dark:bg-[#202c33] text-gray-600 dark:text-gray-400 hover:bg-gray-200"
+            }`}
+          >
+            👥 Users
+          </button>
+        </div>
+
         {/* Posts Management Table */}
-        <div className="bg-white dark:bg-[#202c33] rounded-lg border border-gray-200 dark:border-[#2a3942] overflow-hidden">
+        {activeTab === "posts" && (
+          <div className="bg-white dark:bg-[#202c33] rounded-lg border border-gray-200 dark:border-[#2a3942] overflow-hidden">
           <div className="p-6 border-b border-gray-200 dark:border-[#2a3942]">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
               📋 Post Management
@@ -381,6 +449,122 @@ export default function AdminDashboard() {
             </div>
           )}
         </div>
+        )}
+
+        {/* Users Management Table */}
+        {activeTab === "users" && (
+          <div className="bg-white dark:bg-[#202c33] rounded-lg border border-gray-200 dark:border-[#2a3942] overflow-hidden">
+            <div className="p-6 border-b border-gray-200 dark:border-[#2a3942] flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  👥 User Management
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">View all registered users with email and phone details.</p>
+              </div>
+              <button
+                onClick={handleSyncToSheets}
+                disabled={isSyncing}
+                className={`px-4 py-2 rounded-lg font-bold transition-colors flex items-center gap-2 ${
+                  isSyncing
+                    ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed'
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                }`}
+              >
+                {isSyncing ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    📊 Sync to Google Sheets
+                  </>
+                )}
+              </button>
+            </div>
+
+            {isLoading ? (
+              <div className="p-8 text-center">
+                <p className="text-gray-500">Loading users...</p>
+              </div>
+            ) : users.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="text-gray-500">No users found</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-[#111b21] border-b border-gray-200 dark:border-[#2a3942]">
+                      <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
+                        Full Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
+                        Email
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
+                        Phone
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
+                        Campus
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
+                        Joined
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map((user) => (
+                      <tr
+                        key={user.id}
+                        className="border-b border-gray-200 dark:border-[#2a3942] hover:bg-gray-50 dark:hover:bg-[#2a3942] transition-colors"
+                      >
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100 font-medium">
+                          {user.full_name || "—"}
+                          {user.is_admin && (
+                            <span className="ml-2 px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full font-bold">
+                              ADMIN
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-mono">
+                          {user.email}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-mono">
+                          {user.phone || (
+                            <span className="text-gray-400 dark:text-gray-600 italic">Not set</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                          {user.campus || "—"}
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          {user.phone_verified ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold">
+                              <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                              Verified
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-xs font-bold">
+                              <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>
+                              Pending
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                          {new Date(user.created_at).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Toast Notification */}
