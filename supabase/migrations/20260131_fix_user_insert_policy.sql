@@ -3,6 +3,7 @@
 -- Drop existing policies
 DROP POLICY IF EXISTS "Users can insert own record" ON users;
 DROP POLICY IF EXISTS "Service role can insert users" ON users;
+DROP POLICY IF EXISTS "Enable insert for authentication" ON users;
 
 -- Allow inserts when user matches auth.uid() or during initial signup
 CREATE POLICY "Enable insert for authentication"

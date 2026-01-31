@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { listingRateLimiter, listingRateLimiterByIP } from "@/lib/rateLimiter";
 import { notifyAdminsOfNewListing } from "@/lib/notifications";
+import { CreateListingSchema, validateSchema } from "@/lib/validation-schemas";
+import * as Sentry from "@sentry/nextjs";
 
 // Add security headers to all responses
 const addSecurityHeaders = (response: NextResponse) => {
@@ -24,6 +26,15 @@ const sanitizeInput = (input: string): string => {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    
+    // Validate input
+    const validation = validateSchema(CreateListingSchema, body);
+    if (!validation.success) {
+      return addSecurityHeaders(
+        NextResponse.json({ error: validation.error }, { status: 400 })
+      );
+    }
+    
     const {
       title,
       description,
@@ -31,9 +42,8 @@ export async function POST(req: Request) {
       price,
       campus,
       condition,
-      isRequest,
-      images = [], // array of storage paths (e.g. "userId/ts-0-filename.jpg")
-    } = body;
+      images,
+    } = validation.data;
 
     const supabase = await createServerClient();
 
