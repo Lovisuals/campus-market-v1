@@ -59,7 +59,7 @@ export default function RegisterPage() {
             campus: formData.campus,
             phone: formData.phone,
           },
-          emailRedirectTo: `${window.location.origin}/complete-profile`,
+          emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/complete-profile`,
         }
       });
 
