@@ -67,7 +67,8 @@ export async function POST(req: Request) {
     }
 
     // Encrypt message content
-    const { encrypted, iv } = encryptMessage(content);
+    const encryptionKey = process.env.MESSAGE_ENCRYPTION_KEY || 'default-key-change-in-production-32chars';
+    const { ciphertext, iv, authTag } = await encryptMessage(content, encryptionKey);
 
     // Insert message
     const { data: message, error: messageError } = await supabase
@@ -75,8 +76,9 @@ export async function POST(req: Request) {
       .insert({
         sender_id: user.id,
         recipient_id,
-        content: encrypted,
+        content: ciphertext,
         encryption_iv: iv,
+        auth_tag: authTag,
         listing_id,
         flagged: moderation.flagged,
         flagged_reason: moderation.flagged ? moderation.reasons.join(', ') : null

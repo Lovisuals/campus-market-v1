@@ -31,10 +31,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const { reported_user_id, reported_listing_id, reported_message_id, reason, description } = validation.data;
+    const { reported_user_id, listing_id, reason, description } = validation.data;
 
     // Verify at least one target is provided
-    if (!reported_user_id && !reported_listing_id && !reported_message_id) {
+    if (!reported_user_id && !listing_id) {
       return NextResponse.json({ 
         error: 'Must specify what to report' 
       }, { status: 400 });
@@ -55,8 +55,7 @@ export async function POST(req: Request) {
       .gte('created_at', oneDayAgo);
 
     if (reported_user_id) duplicateQuery = duplicateQuery.eq('reported_user_id', reported_user_id);
-    if (reported_listing_id) duplicateQuery = duplicateQuery.eq('reported_listing_id', reported_listing_id);
-    if (reported_message_id) duplicateQuery = duplicateQuery.eq('reported_message_id', reported_message_id);
+    if (listing_id) duplicateQuery = duplicateQuery.eq('reported_listing_id', listing_id);
 
     const { data: existing } = await duplicateQuery.single();
 
@@ -72,8 +71,7 @@ export async function POST(req: Request) {
       .insert({
         reporter_id: user.id,
         reported_user_id,
-        reported_listing_id,
-        reported_message_id,
+        reported_listing_id: listing_id,
         reason,
         description,
         status: 'pending'
@@ -92,7 +90,7 @@ export async function POST(req: Request) {
         action: 'report_submitted',
         reason,
         target_user: reported_user_id,
-        target_listing: reported_listing_id
+        target_listing: listing_id
       }, req);
     }
 

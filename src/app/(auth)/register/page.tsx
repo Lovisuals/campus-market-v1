@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { normalizePhoneNumber } from "@/lib/phone-validator";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -15,6 +16,8 @@ export default function RegisterPage() {
     phone: "",
     campus: "",
   });
+  const [phoneFormatted, setPhoneFormatted] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +35,30 @@ export default function RegisterPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    // Handle phone validation in real-time
+    if (name === "phone") {
+      if (!value.trim()) {
+        // Phone is optional, clear errors if empty
+        setPhoneError("");
+        setPhoneFormatted("");
+        setFormData((prev) => ({ ...prev, [name]: value }));
+        return;
+      }
+
+      const validation = normalizePhoneNumber(value, 'NG');
+      
+      if (validation.valid) {
+        setPhoneError("");
+        setPhoneFormatted(validation.formatted);
+        setFormData((prev) => ({ ...prev, [name]: validation.normalized }));
+      } else {
+        setPhoneError(validation.error || "Please enter a valid Nigerian phone number");
+        setFormData((prev) => ({ ...prev, [name]: value }));
+      }
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleNextStep = async (e: React.FormEvent) => {
@@ -49,6 +75,11 @@ export default function RegisterPage() {
     setError(null);
 
     try {
+      // Validate phone if provided
+      if (formData.phone && phoneError) {
+        throw new Error(phoneError);
+      }
+
       // Sign up with Supabase
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
@@ -57,7 +88,7 @@ export default function RegisterPage() {
           data: {
             full_name: formData.full_name,
             campus: formData.campus,
-            phone: formData.phone,
+            phone: formData.phone, // Already normalized
           },
           emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/complete-profile`,
         }
@@ -162,8 +193,19 @@ export default function RegisterPage() {
                     value={formData.phone}
                     onChange={handleChange}
                     placeholder="+234 801 234 5678"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-wa-teal focus:border-transparent outline-none transition-all text-lg"
+                    className={`w-full px-4 py-3 border-2 rounded-2xl focus:ring-2 focus:ring-wa-teal focus:border-transparent outline-none transition-all text-lg ${
+                      phoneError ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                    }`}
                   />
+                  {phoneError && (
+                    <p className="text-xs text-red-600 mt-2 font-semibold">⚠️ {phoneError}</p>
+                  )}
+                  {phoneFormatted && !phoneError && (
+                    <p className="text-xs text-green-600 mt-2 font-semibold">✓ {phoneFormatted}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-2">
+                    Supported formats: 08012345678, +2348012345678, +234 801 234 5678
+                  </p>
                 </div>
               </>
             ) : (
@@ -209,19 +251,30 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 font-black rounded-2xl transition-colors"
+                  disabled={isLoading}
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 font-black rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Back
                 </button>
               )}
               <button
                 type="submit"
-                disabled={isLoading}
-                className={`flex-1 py-3 bg-gradient-to-r from-wa-teal to-[#006d59] text-white font-black rounded-2xl hover:shadow-lg transition-all disabled:opacity-50 text-lg ${
+                disabled={isLoading || (formData.phone && !!phoneError)}
+                className={`flex-1 py-3 bg-gradient-to-r from-wa-teal to-[#006d59] text-white font-black rounded-2xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg ${
                   step === 1 ? "w-full" : ""
                 }`}
               >
-                {isLoading ? "Processing..." : step === 1 ? "Next" : "Create Account"}
+                {isLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                  </span>
+                ) : (
+                  step === 1 ? "Next" : "Create Account"
+                )}
               </button>
             </div>
           </form>

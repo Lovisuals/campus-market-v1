@@ -230,7 +230,8 @@ test.describe('Content Moderation', () => {
     await page.goto('/moderation');
     
     // Should show pending items
-    await expect(page.locator('.moderation-item')).toHaveCount.greaterThan(0);
+    const moderationItems = page.locator('.moderation-item');
+    await expect(moderationItems.first()).toBeVisible();
     
     // Can approve
     await page.click('.moderation-item:first-child button:has-text("Approve")');
