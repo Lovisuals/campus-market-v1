@@ -135,9 +135,10 @@ export default function AdminDashboard() {
         pendingVerifications: prev.pendingVerifications - 1,
         verifiedListings: prev.verifiedListings + 1,
       }));
+      showToast('Verification approved successfully', 'success');
     } catch (error) {
       console.error("Error approving verification:", error);
-      alert("Failed to approve verification");
+      showToast('Failed to approve verification', 'error');
     }
   };
 
@@ -155,10 +156,18 @@ export default function AdminDashboard() {
         ...prev,
         pendingVerifications: prev.pendingVerifications - 1,
       }));
+      showToast('Verification rejected', 'success');
     } catch (error) {
       console.error("Error rejecting verification:", error);
-      alert("Failed to reject verification");
+      showToast('Failed to reject verification', 'error');
     }
+  };
+
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
   };
 
   const handleDeletePost = async (id: string) => {
@@ -169,9 +178,10 @@ export default function AdminDashboard() {
       setListings((prev) => prev.filter((l) => l.id !== id));
       setStats((prev) => ({ ...prev, totalListings: prev.totalListings - 1 }));
       setDeleteConfirm(null);
+      showToast('Post deleted successfully', 'success');
     } catch (error) {
       console.error("Error deleting post:", error);
-      alert("Failed to delete post");
+      showToast('Failed to delete post', 'error');
     }
   };
 
@@ -190,14 +200,28 @@ export default function AdminDashboard() {
 
       if (!currentStatus) {
         setStats((prev) => ({ ...prev, verifiedListings: prev.verifiedListings + 1 }));
+        showToast('Post verified successfully', 'success');
       } else {
         setStats((prev) => ({ ...prev, verifiedListings: prev.verifiedListings - 1 }));
+        showToast('Post unverified successfully', 'success');
       }
     } catch (error) {
       console.error("Error verifying post:", error);
-      alert("Failed to verify post");
+      showToast('Failed to verify post', 'error');
     }
   };
+
+  // Don't render anything until auth check is complete
+  if (isLoading || !isAdmin) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-[#111b21] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-wa-teal border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-white dark:bg-[#111b21]">
@@ -358,6 +382,22 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 animate-slide-in-right">
+          <div
+            className={`px-6 py-4 rounded-lg shadow-2xl border-2 flex items-center gap-3 min-w-[300px] ${
+              toast.type === 'success'
+                ? 'bg-green-50 dark:bg-green-900/30 border-green-500 text-green-800 dark:text-green-200'
+                : 'bg-red-50 dark:bg-red-900/30 border-red-500 text-red-800 dark:text-red-200'
+            }`}
+          >
+            <span className="text-2xl">{toast.type === 'success' ? '✓' : '✕'}</span>
+            <p className="font-semibold">{toast.message}</p>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
