@@ -162,9 +162,9 @@ export default function MarketPage() {
 
       {/* Header */}
       <div className="sticky top-16 z-40 bg-white dark:bg-[#111b21] border-b border-gray-100 dark:border-[#2a3942]">
-        <div className="px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-black text-gray-900 dark:text-white">
+        <div className="px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">
               {viewMode === "all" ? "📦 For Sale" : "🙋 Buy Requests"}
             </h1>
             <button
@@ -177,15 +177,15 @@ export default function MarketPage() {
           </div>
 
           {/* Search Bar */}
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-2 mb-3 sm:mb-4">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search items, sellers..."
-              className="flex-1 px-4 py-2 bg-gray-100 dark:bg-[#2a3942] rounded-full text-sm outline-none focus:ring-2 focus:ring-wa-teal"
+              className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 bg-gray-100 dark:bg-[#2a3942] rounded-full text-sm outline-none focus:ring-2 focus:ring-wa-teal"
             />
-            <button className="p-2 bg-gray-100 dark:bg-[#2a3942] rounded-full text-gray-600 hover:text-wa-teal transition-colors">
+            <button className="p-2 sm:p-2.5 bg-gray-100 dark:bg-[#2a3942] rounded-full text-gray-600 hover:text-wa-teal transition-colors min-w-[40px]">
               🔍
             </button>
           </div>
@@ -234,18 +234,18 @@ export default function MarketPage() {
       </div>
 
       {/* Listings Grid */}
-      <div className="px-4 py-6">
+      <div className="px-3 sm:px-4 py-4 sm:py-6">
         {isLoading ? (
-          <div className="text-center py-12">
+          <div className="text-center py-10 sm:py-12">
             <p className="text-gray-500">Loading listings...</p>
           </div>
         ) : listings.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No listings found</p>
+          <div className="text-center py-10 sm:py-12">
+            <p className="text-gray-500 text-base sm:text-lg">No listings found</p>
             <p className="text-gray-400 text-sm">Try a different search or campus</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             {listings.map((listing) => (
               <div
                 key={listing.id}

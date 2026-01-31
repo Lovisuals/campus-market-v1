@@ -201,10 +201,10 @@ export default function AdminDashboard() {
 
   return (
     <main className="min-h-screen bg-white dark:bg-[#111b21]">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-black text-gray-900 dark:text-white">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white">
             👑 Admin Control Panel
           </h1>
           <button
@@ -216,7 +216,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
             <p className="text-3xl font-black text-blue-600">{stats.totalListings}</p>
             <p className="text-sm text-gray-600 dark:text-gray-400">Total Posts</p>
@@ -310,13 +310,13 @@ export default function AdminDashboard() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm">
-                        <div className="flex gap-2">
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm">
+                        <div className="flex flex-wrap gap-1.5 sm:gap-2">
                           <button
                             onClick={() =>
                               handleVerifyPost(listing.id, listing.is_verified)
                             }
-                            className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
+                            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-bold transition-colors min-w-[60px] sm:min-w-auto ${
                               listing.is_verified
                                 ? "bg-gray-200 dark:bg-[#3a4a52] text-gray-700 dark:text-gray-300 hover:bg-gray-300"
                                 : "bg-green-200 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-300"

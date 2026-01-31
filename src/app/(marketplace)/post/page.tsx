@@ -214,8 +214,8 @@ export default function PostListingPage() {
 
   return (
     <main className="min-h-screen bg-white dark:bg-[#111b21] pb-20">
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-6">
+      <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mb-4 sm:mb-6">
           {formData.isRequest ? "📥 What are you looking for?" : "📤 What are you selling?"}
         </h1>
 
@@ -311,7 +311,7 @@ export default function PostListingPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Category
@@ -321,7 +321,7 @@ export default function PostListingPage() {
                 value={formData.category}
                 onChange={handleChange}
                 title="Select item category"
-                className="w-full px-4 py-3 border border-gray-300 dark:border-[#2a3942] rounded-lg bg-white dark:bg-[#202c33] text-gray-900 dark:text-white focus:ring-2 focus:ring-wa-teal"
+                className="w-full px-3 sm:px-4 py-3 sm:py-3.5 border border-gray-300 dark:border-[#2a3942] rounded-lg bg-white dark:bg-[#202c33] text-gray-900 dark:text-white focus:ring-2 focus:ring-wa-teal text-base"
                 required
               >
                 <option value="">Select category</option>

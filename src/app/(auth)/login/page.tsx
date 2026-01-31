@@ -44,11 +44,11 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-wa-teal to-[#006d59] flex items-center justify-center px-4 py-8">
+    <main className="min-h-screen bg-gradient-to-b from-wa-teal to-[#006d59] flex items-center justify-center px-4 sm:px-6 py-6 sm:py-8">
       <div className="w-full max-w-md">
         {/* Logo/Brand Section */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-full mb-4 shadow-lg">
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="inline-flex items-center justify-center w-16 sm:w-20 h-16 sm:h-20 bg-white rounded-full mb-3 sm:mb-4 shadow-lg">
             <span className="text-4xl">🛍️</span>
           </div>
           <h1 className="text-3xl font-black text-white mb-2">Campus Market</h1>
@@ -56,10 +56,10 @@ export default function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-3xl shadow-2xl p-8 space-y-6">
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl p-6 sm:p-8 space-y-5 sm:space-y-6">
           {/* Title */}
           <div className="text-center">
-            <h2 className="text-2xl font-black text-gray-900 mb-2">Welcome back</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-gray-900 mb-2">Welcome back</h2>
             <p className="text-gray-600 text-sm">Sign in with your phone number to continue</p>
           </div>
 
