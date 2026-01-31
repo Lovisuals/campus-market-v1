@@ -567,18 +567,30 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* Toast Notification */}
+      {/* Scrolling Ticker Alert */}
       {toast && (
-        <div className="fixed top-4 right-4 z-50 animate-slide-in-right">
+        <div className="fixed top-0 left-0 right-0 z-50 overflow-hidden">
           <div
-            className={`px-6 py-4 rounded-lg shadow-2xl border-2 flex items-center gap-3 min-w-[300px] ${
+            className={`py-3 ${
               toast.type === 'success'
-                ? 'bg-green-50 dark:bg-green-900/30 border-green-500 text-green-800 dark:text-green-200'
-                : 'bg-red-50 dark:bg-red-900/30 border-red-500 text-red-800 dark:text-red-200'
+                ? 'bg-green-600 dark:bg-green-700'
+                : 'bg-red-600 dark:bg-red-700'
             }`}
           >
-            <span className="text-2xl">{toast.type === 'success' ? '✓' : '✕'}</span>
-            <p className="font-semibold">{toast.message}</p>
+            <div className="animate-ticker whitespace-nowrap">
+              <span className="inline-block px-8 text-white font-bold text-sm">
+                {toast.type === 'success' ? '✓' : '✕'} {toast.message}
+              </span>
+              <span className="inline-block px-8 text-white font-bold text-sm">
+                {toast.type === 'success' ? '✓' : '✕'} {toast.message}
+              </span>
+              <span className="inline-block px-8 text-white font-bold text-sm">
+                {toast.type === 'success' ? '✓' : '✕'} {toast.message}
+              </span>
+              <span className="inline-block px-8 text-white font-bold text-sm">
+                {toast.type === 'success' ? '✓' : '✕'} {toast.message}
+              </span>
+            </div>
           </div>
         </div>
       )}

@@ -9,6 +9,8 @@
 
 ## Step 2: Copy and Paste This SQL
 
+⚠️ **IMPORTANT**: Copy ONLY the SQL code below (starting from `-- Create user_devices` and ending with the last semicolon). Do NOT copy the ```sql markers or any markdown formatting.
+
 ```sql
 -- Create user_devices table for IP tracking and device fingerprinting
 CREATE TABLE IF NOT EXISTS user_devices (

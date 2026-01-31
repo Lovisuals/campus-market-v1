@@ -103,32 +103,35 @@ export default function PhoneLoginPage() {
       }
 
       // Mark OTP as used
-      await supabase
+      const { error: updateError } = await supabase
         .from("otp_sessions")
         .update({ used: true, verified_at: new Date().toISOString() })
         .eq("id", otpData.id);
 
-      // Get user email for sign in
-      const { data: userData } = await supabase
+      if (updateError) throw updateError;
+
+      // Get user data
+      const { data: userData, error: userError } = await supabase
         .from("users")
         .select("email")
         .eq("id", userId)
         .single();
 
-      if (!userData) throw new Error("User not found");
+      if (userError || !userData?.email) throw new Error("User not found");
 
-      // Sign in user using email (since Supabase auth uses email)
-      const { error: signInError } = await supabase.auth.signInWithOtp({
+      // Send magic link for final authentication
+      const { error: magicLinkError } = await supabase.auth.signInWithOtp({
         email: userData.email,
         options: {
           shouldCreateUser: false,
+          emailRedirectTo: `${window.location.origin}/market`,
         }
       });
 
-      if (signInError) throw signInError;
+      if (magicLinkError) throw magicLinkError;
 
-      // Redirect to market
-      router.push("/market");
+      // Show success message
+      alert(`✅ OTP Verified! Check your email (${userData.email}) for the login link.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed");
     } finally {
