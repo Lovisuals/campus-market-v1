@@ -289,7 +289,7 @@ CREATE POLICY "Users can view messages in their chats"
     EXISTS (
       SELECT 1 FROM chats
       WHERE chats.id = messages.chat_id
-      AND (chats.buyer_id = auth.uid() OR chats.seller_id = auth.uid())
+      AND (chats.user1_id = auth.uid() OR chats.user2_id = auth.uid())
     )
   );
 
@@ -301,7 +301,7 @@ CREATE POLICY "Users can send messages in their chats"
     AND EXISTS (
       SELECT 1 FROM chats
       WHERE chats.id = messages.chat_id
-      AND (chats.buyer_id = auth.uid() OR chats.seller_id = auth.uid())
+      AND (chats.user1_id = auth.uid() OR chats.user2_id = auth.uid())
     )
   );
 
