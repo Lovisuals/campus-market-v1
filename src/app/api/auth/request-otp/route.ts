@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('id, phone, phone_verified')
+      .select('id, phone, phone_verified, email')
       .eq('id', validated.userId)
       .single();
 
@@ -81,32 +81,52 @@ export async function POST(request: NextRequest) {
       ip
     );
 
-    // Send OTP via SMS (using Twilio or similar)
+    // Send OTP via Resend email
     try {
-      // TODO: Integrate with Twilio or other SMS provider
-      // For now, log to console (DEVELOPMENT ONLY)
-      console.log(`OTP for ${phoneValidation.normalized}: ${code}`);
-      
-      // In production, uncomment and configure:
-      /*
-      const twilio = require('twilio');
-      const client = twilio(
-        process.env.TWILIO_ACCOUNT_SID,
-        process.env.TWILIO_AUTH_TOKEN
-      );
-      
-      await client.messages.create({
-        body: `Your Campus Market verification code is: ${code}. Valid for 5 minutes.`,
-        from: process.env.TWILIO_PHONE_NUMBER,
-        to: phoneValidation.normalized
-      });
-      */
+      const RESEND_API_KEY = process.env.RESEND_API_KEY;
+      const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@campusmarketp2p.com.ng';
+
+      if (!RESEND_API_KEY) {
+        console.error('RESEND_API_KEY is not configured');
+        console.log(`OTP for ${phoneValidation.normalized}: ${code}`);
+      } else {
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: FROM_EMAIL,
+            to: user.email || validated.userId,
+            subject: 'Campus Market - Verification Code',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2>Your Verification Code</h2>
+                <p>Your Campus Market verification code is:</p>
+                <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; margin: 20px 0;">
+                  ${code}
+                </div>
+                <p>This code will expire in 5 minutes.</p>
+                <p>If you didn't request this code, please ignore this email.</p>
+              </div>
+            `,
+          }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          console.error('Resend API error:', data);
+        }
+      }
+
+      // Also log for development
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`OTP for ${phoneValidation.normalized}: ${code}`);
+      }
     } catch (smsError) {
-      console.error('Failed to send SMS:', smsError);
-      return NextResponse.json(
-        { error: 'Failed to send OTP. Please try again.' },
-        { status: 500 }
-      );
+      console.error('Failed to send OTP:', smsError);
+      // Don't fail the request, just log the error
     }
 
     return NextResponse.json({
