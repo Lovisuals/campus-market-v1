@@ -65,26 +65,12 @@ export default function RegisterPage() {
 
       if (signUpError) throw signUpError;
 
-      if (data.user) {
-        // Create user record (phone will be added in complete-profile)
-        const { error: insertError } = await supabase.from("users").insert([
-          {
-            id: data.user.id,
-            email: formData.email,
-            full_name: formData.full_name,
-            campus: formData.campus,
-            phone: formData.phone || null,
-            is_admin: false,
-            phone_verified: false,
-          },
-        ]);
-
-        if (insertError && insertError.code !== '23505') { // Ignore duplicate key error
-          console.error('Error creating user record:', insertError);
-        }
+      if (!data.user) {
+        throw new Error("Registration failed - no user created");
       }
 
-      // Show success message
+      // User record is automatically created by database trigger
+      // Just show success message
       router.push(`/login?registered=true`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
