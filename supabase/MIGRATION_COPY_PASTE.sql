@@ -12,7 +12,11 @@
 -- ✅ Create 50+ security policies
 --
 -- ⚠️ SAFE TO RUN MULTIPLE TIMES - Uses IF NOT EXISTS checks
+-- ⚠️ Ignore any "duplicate" warnings - they're normal
 -- ============================================================================
+
+-- Start transaction for safety
+BEGIN;
 
 -- ============================================================================
 -- STEP 1: ADD PHONE VERIFIED COLUMN
@@ -323,6 +327,9 @@ FROM information_schema.tables
 WHERE table_schema = 'public' 
 AND table_name IN ('otp_sessions', 'trusted_devices', 'audit_logs')
 ORDER BY table_name;
+
+-- Commit transaction
+COMMIT;
 
 -- ============================================================================
 -- ✅ MIGRATION COMPLETE!
