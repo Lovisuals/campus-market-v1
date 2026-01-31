@@ -113,6 +113,10 @@ export async function PATCH(req: Request) {
     const validation = validateSchema(UpdateTransactionStatusSchema, body);
     if (!validation.success) {
       return NextResponse.json({ error: (validation as { success: false; error: string }).error }, { status: 400 });
+    }
+
+    const { transaction_id, status, notes } = (validation as { success: true; data: any }).data;
+
     const { data: transaction, error: txError } = await supabase
       .from('transactions')
       .select('*, listing:listings(*)')
