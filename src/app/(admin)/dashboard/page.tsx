@@ -186,10 +186,36 @@ export default function AdminDashboard() {
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleSeedData = async () => {
+    setIsSeeding(true);
+    try {
+      const response = await fetch('/api/admin/seed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count: 10 }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Seeding failed');
+
+      showToast(`✓ Seeded ${data.data.length} new listings!`, 'success');
+      // Refresh listings
+      const { data: newItems } = await supabase
+        .from("listings")
+        .select("*")
+        .order("created_at", { ascending: false });
+      setListings(newItems || []);
+    } catch (error: any) {
+      showToast(`✕ ${error.message}`, 'error');
+    } finally {
+      setIsSeeding(false);
+    }
   };
 
   const handleSyncToSheets = async () => {
@@ -342,11 +368,23 @@ export default function AdminDashboard() {
         {/* Posts Management Table */}
         {activeTab === "posts" && (
           <div className="bg-white dark:bg-[#202c33] rounded-lg border border-gray-200 dark:border-[#2a3942] overflow-hidden">
-            <div className="p-6 border-b border-gray-200 dark:border-[#2a3942]">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                📋 Post Management
-              </h2>
-              <p className="text-sm text-gray-500 mt-1">Delete or verify posts. Manage the marketplace.</p>
+            <div className="p-6 border-b border-gray-200 dark:border-[#2a3942] flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  📋 Post Management
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">Delete or verify posts. Manage the marketplace.</p>
+              </div>
+              <button
+                onClick={handleSeedData}
+                disabled={isSeeding}
+                className={`px-4 py-2 rounded-lg font-bold transition-all flex items-center gap-2 ${isSeeding
+                  ? 'bg-gray-300 dark:bg-gray-600 text-gray-500'
+                  : 'bg-purple-600 text-white hover:bg-purple-700 shadow-lg'
+                  }`}
+              >
+                {isSeeding ? '🌱 Seeding...' : '✨ Seed Real-time Data'}
+              </button>
             </div>
 
             {isLoading ? (
@@ -373,6 +411,9 @@ export default function AdminDashboard() {
                       </th>
                       <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
                         Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
+                        Seller 📱
                       </th>
                       <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
                         Actions
@@ -412,6 +453,20 @@ export default function AdminDashboard() {
                               </>
                             )}
                           </div>
+                        </td>
+                        <td className="px-6 py-4 text-xs">
+                          {users.find(u => u.id === listing.seller_id)?.phone ? (
+                            <a
+                              href={`https://wa.me/${users.find(u => u.id === listing.seller_id)?.phone?.replace(/\+/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-wa-teal font-bold hover:underline"
+                            >
+                              WhatsApp Nudge
+                            </a>
+                          ) : (
+                            <span className="text-gray-400">No Phone</span>
+                          )}
                         </td>
                         <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm">
                           <div className="flex flex-wrap gap-1.5 sm:gap-2">

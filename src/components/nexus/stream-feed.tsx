@@ -32,6 +32,8 @@ export function StreamFeed() {
             // Note: randomness in SQL: RANDOM() * log(EXTRACT(EPOCH FROM now() - created_at) + 1)
             // For now, we'll fetch verified/recent and shuffle in JS for maximum randomness
 
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
             const { data, error } = await supabase
                 .from("listings")
                 .select(`
@@ -46,8 +48,9 @@ export function StreamFeed() {
                     seller:users(full_name, vouch_count)
                 `)
                 .eq("status", "active")
+                .gt("created_at", sevenDaysAgo)
                 .order("created_at", { ascending: false })
-                .limit(20);
+                .limit(40);
 
             if (data) {
                 // Shuffle logic for "Freshness + Variety"
@@ -93,7 +96,13 @@ export function StreamFeed() {
                         description={item.description || `Fresh listing from ${item.campus}`}
                         imageUrl={item.image_url || "https://images.unsplash.com/photo-1580910051074-3eb0948865c5?q=80&w=1000"}
                         vouchCount={item.seller?.vouch_count || 0}
-                        timeLeft={new Date(item.created_at).toLocaleDateString()}
+                        timeLeft={(() => {
+                            const created = new Date(item.created_at).getTime();
+                            const now = Date.now();
+                            const diff = (7 * 24 * 60 * 60 * 1000) - (now - created);
+                            const days = Math.ceil(diff / (24 * 60 * 60 * 1000));
+                            return days > 0 ? `${days}d left` : "Expired";
+                        })()}
                         dominantColor={item.is_verified ? "from-nexus-action" : "from-nexus-primary"}
                         price={item.price}
                     />
