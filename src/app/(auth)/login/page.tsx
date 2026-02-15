@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { normalizePhoneNumber } from "@/lib/phone-validator";
@@ -31,9 +31,21 @@ export default function LoginPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [isRecognized, setIsRecognized] = useState(false);
   const [displayEmail, setDisplayEmail] = useState("");
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (cooldown > 0) {
+      timer = setInterval(() => {
+        setCooldown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [cooldown]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (cooldown > 0) return;
     setIsLoading(true);
     setError(null);
     setIsRecognized(false);
@@ -90,11 +102,16 @@ export default function LoginPage() {
         }
       });
 
-      if (error) throw error;
-
       setOtpSent(true);
+      setCooldown(60); // 1 minute cooldown
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      const msg = err instanceof Error ? err.message : "Login failed";
+      if (msg.toLowerCase().includes("rate limit") || msg.toLowerCase().includes("too many requests")) {
+        setError("Slow down! You've requested too many codes. Please check your email inbox first or wait 60 seconds.");
+        setCooldown(60);
+      } else {
+        setError(msg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -175,7 +192,7 @@ export default function LoginPage() {
 
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || cooldown > 0}
                   className="w-full py-3 bg-gradient-to-r from-wa-teal to-[#006d59] text-white font-black rounded-2xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg"
                 >
                   {isLoading ? (
@@ -186,6 +203,8 @@ export default function LoginPage() {
                       </svg>
                       Sending...
                     </span>
+                  ) : cooldown > 0 ? (
+                    `Wait ${cooldown}s`
                   ) : (
                     "Send Magic Link"
                   )}

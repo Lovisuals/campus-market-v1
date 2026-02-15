@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Heart, Share2, Sparkles, CheckCircle2 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ interface StreamCardProps {
     vouchCount: number;
     timeLeft?: string; // e.g., "2h left"
     dominantColor?: string; // Dynamic background support
+    price?: number;
 }
 
 export function StreamCard({
@@ -25,7 +26,12 @@ export function StreamCard({
     vouchCount,
     timeLeft,
     dominantColor = "from-nexus-primary",
+    price,
 }: StreamCardProps) {
+    const [liked, setLiked] = useState(false);
+    const [vouched, setVouched] = useState(false);
+    const [localLikes, setLocalLikes] = useState(Math.floor(Math.random() * 100) + 10);
+
     return (
         <div className="relative w-full h-[85vh] snap-center shrink-0 rounded-3xl overflow-hidden mx-auto max-w-md my-4 shadow-2xl border border-white/5 bg-gray-900 group">
 
@@ -59,10 +65,19 @@ export function StreamCard({
             {/* Right Sidebar: Social Actions */}
             <div className="absolute right-4 bottom-32 z-20 flex flex-col gap-6 items-center">
                 <div className="flex flex-col items-center gap-1">
-                    <button className="p-3 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-nexus-alert/20 hover:text-nexus-alert transition-all active:scale-90">
-                        <Heart className="w-7 h-7" />
+                    <button
+                        onClick={() => {
+                            setLiked(!liked);
+                            setLocalLikes(prev => liked ? prev - 1 : prev + 1);
+                        }}
+                        className={cn(
+                            "p-3 backdrop-blur-md rounded-full transition-all active:scale-90",
+                            liked ? "bg-nexus-alert text-white" : "bg-black/40 text-white hover:bg-nexus-alert/20"
+                        )}
+                    >
+                        <Heart className={cn("w-7 h-7", liked && "fill-current")} />
                     </button>
-                    <span className="text-xs font-medium text-white shadow-black drop-shadow-md">2.4k</span>
+                    <span className="text-xs font-medium text-white shadow-black drop-shadow-md">{localLikes > 0 ? (localLikes / 10).toFixed(1) + 'k' : '0'}</span>
                 </div>
 
                 <div className="flex flex-col items-center gap-1">
@@ -73,18 +88,31 @@ export function StreamCard({
                 </div>
 
                 <div className="flex flex-col items-center gap-1">
-                    <button className="p-3 bg-black/40 backdrop-blur-md rounded-full text-white hover:text-yellow-400 transition-all active:scale-90">
-                        <Sparkles className="w-7 h-7" />
+                    <button
+                        onClick={() => setVouched(!vouched)}
+                        className={cn(
+                            "p-3 backdrop-blur-md rounded-full transition-all active:scale-90",
+                            vouched ? "bg-yellow-400 text-black" : "bg-black/40 text-white hover:text-yellow-400"
+                        )}
+                    >
+                        <Sparkles className={cn("w-7 h-7", vouched && "fill-current")} />
                     </button>
-                    <span className="text-xs font-medium text-white shadow-black drop-shadow-md">Vouch</span>
+                    <span className="text-xs font-medium text-white shadow-black drop-shadow-md">
+                        {vouched ? "Vouched" : "Vouch"}
+                    </span>
                 </div>
             </div>
 
             {/* Bottom Content: Offer & CTA */}
-            <div className="absolute bottom-0 left-0 right-0 p-6 z-20 flex flex-col gap-3 bg-gradient-to-t from-black via-black/80 to-transparent pt-12">
-                <h2 className="text-4xl font-black text-white leading-tight font-[ClashDisplay] drop-shadow-lg">
+            <div className="absolute bottom-0 left-0 right-0 p-6 pb-12 z-20 flex flex-col gap-3 bg-gradient-to-t from-black via-black/80 to-transparent pt-12">
+                <h2 className="text-3xl sm:text-4xl font-black text-white leading-tight font-[ClashDisplay] drop-shadow-lg">
                     {offerText}
                 </h2>
+                {price !== undefined && (
+                    <div className="inline-flex bg-nexus-action px-3 py-1 rounded-lg text-white font-black text-xl shadow-lg border border-white/20 w-fit">
+                        ₦{price.toLocaleString()}
+                    </div>
+                )}
                 <p className="text-gray-200 text-sm line-clamp-2 leading-relaxed opacity-90">
                     {description}
                 </p>

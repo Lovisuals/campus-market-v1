@@ -1,60 +1,107 @@
-"use client";
-
-import React from "react";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { StreamCard } from "./stream-card";
 
-// Mock Data for Phase 1
-const mockStreamItems = [
-    {
-        id: 1,
-        brandName: "Spotify",
-        offerText: "3 Months Free Premium",
-        description: "Unlock ad-free music, offline listening, and more. Exclusive for verified students. Limited time offer for finals week.",
-        imageUrl: "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?q=80&w=1000",
-        vouchCount: 842,
-        timeLeft: "4h left",
-        dominantColor: "from-nexus-action"
-    },
-    {
-        id: 2,
-        brandName: "Nike",
-        offerText: "40% OFF Air Max",
-        description: "The flash drop you've been waiting for. Valid on all Air Max models. In-store and online.",
-        imageUrl: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=1000",
-        vouchCount: 1205,
-        timeLeft: "20m left",
-        dominantColor: "from-nexus-alert"
-    },
-    {
-        id: 3,
-        brandName: "Adobe",
-        offerText: "Creative Cloud 60% OFF",
-        description: "Design your future. Get the entire suite of creative apps including Photoshop and Illustrator.",
-        imageUrl: "https://images.unsplash.com/photo-1626785774573-4b7993143d2d?q=80&w=1000",
-        vouchCount: 560,
-        dominantColor: "from-nexus-primary"
-    }
-];
+interface ListingItem {
+    id: string;
+    title: string;
+    description: string;
+    price: number;
+    image_url: string;
+    campus: string;
+    created_at: string;
+    is_verified: boolean;
+    seller: {
+        full_name: string;
+        vouch_count: number;
+    };
+}
 
 export function StreamFeed() {
+    const [items, setItems] = useState<ListingItem[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const supabase = createClient();
+
+    useEffect(() => {
+        const fetchFeed = async () => {
+            setIsLoading(true);
+
+            // Temu-style Feed Algorithm: 
+            // 1. Fetch active listings
+            // 2. Order by freshness (recent first) but with a salt of randomness
+            // Note: randomness in SQL: RANDOM() * log(EXTRACT(EPOCH FROM now() - created_at) + 1)
+            // For now, we'll fetch verified/recent and shuffle in JS for maximum randomness
+
+            const { data, error } = await supabase
+                .from("listings")
+                .select(`
+                    id, 
+                    title, 
+                    description, 
+                    price, 
+                    image_url, 
+                    campus, 
+                    created_at, 
+                    is_verified,
+                    seller:users(full_name, vouch_count)
+                `)
+                .eq("status", "active")
+                .order("created_at", { ascending: false })
+                .limit(20);
+
+            if (data) {
+                // Shuffle logic for "Freshness + Variety"
+                const shuffled = [...(data as any)].sort(() => Math.random() - 0.5);
+                setItems(shuffled);
+            }
+            setIsLoading(false);
+        };
+
+        fetchFeed();
+    }, [supabase]);
+
+    if (isLoading) {
+        return (
+            <div className="w-full h-screen flex items-center justify-center bg-black">
+                <div className="animate-pulse flex flex-col items-center gap-4">
+                    <div className="w-12 h-12 bg-nexus-primary/20 rounded-full border-4 border-nexus-primary/40 border-t-nexus-primary animate-spin" />
+                    <p className="text-white/50 font-black tracking-widest text-xs uppercase">Curating your feed...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (items.length === 0) {
+        return (
+            <div className="w-full h-screen flex items-center justify-center bg-black px-8 text-center">
+                <div className="space-y-4">
+                    <span className="text-6xl">🏜️</span>
+                    <h2 className="text-2xl font-black text-white">Feed is Empty</h2>
+                    <p className="text-gray-400 text-sm">Be the first to post something on your campus!</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="w-full h-screen snap-y snap-mandatory overflow-y-scroll scrollbar-hide pb-24 pt-4">
-            {mockStreamItems.map((item) => (
-                <div key={item.id} className="w-full h-[90vh] snap-center flex items-center justify-center p-2">
+            {items.map((item) => (
+                <div key={item.id} className="w-full h-[85vh] snap-center flex items-center justify-center p-2 mb-4">
                     <StreamCard
-                        brandName={item.brandName}
-                        offerText={item.offerText}
-                        description={item.description}
-                        imageUrl={item.imageUrl}
-                        vouchCount={item.vouchCount}
-                        timeLeft={item.timeLeft}
-                        dominantColor={item.dominantColor}
+                        brandName={item.seller?.full_name || "Nexus Seller"}
+                        offerText={item.title}
+                        description={item.description || `Fresh listing from ${item.campus}`}
+                        imageUrl={item.image_url || "https://images.unsplash.com/photo-1580910051074-3eb0948865c5?q=80&w=1000"}
+                        vouchCount={item.seller?.vouch_count || 0}
+                        timeLeft={new Date(item.created_at).toLocaleDateString()}
+                        dominantColor={item.is_verified ? "from-nexus-action" : "from-nexus-primary"}
+                        price={item.price}
                     />
                 </div>
             ))}
 
             {/* Footer Spacer */}
-            <div className="h-24 w-full snap-end" />
+            <div className="h-32 w-full snap-end" />
         </div>
     );
 }
