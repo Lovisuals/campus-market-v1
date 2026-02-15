@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 // @ts-ignore
 const nextConfig: any = {
+  trailingSlash: false,
+  skipTrailingSlashRedirect: true,
   typescript: {
     // Ignore TypeScript errors during build
     ignoreBuildErrors: true,
