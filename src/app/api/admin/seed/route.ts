@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// Use service role for seeding to bypass RLS
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 const MOCK_SELLERS = [
     { name: "Chinedu Okafor", campus: "UNILAG", phone: "+2348012345678" },
     { name: "Amina Yusuf", campus: "ABU Zaria", phone: "+2348023456789" },
@@ -25,6 +19,12 @@ const MOCK_PRODUCTS = [
 ];
 
 export async function POST(req: NextRequest) {
+    // Initialize admin client inside handler to avoid build-time environment variable errors
+    const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
     try {
         const { count = 5 } = await req.json();
 
@@ -35,7 +35,6 @@ export async function POST(req: NextRequest) {
             const product = MOCK_PRODUCTS[Math.floor(Math.random() * MOCK_PRODUCTS.length)];
 
             // 1. Ensure a "Seed User" exists or use a generic one
-            // For simplicity, we'll try to find or create a user with this name
             const { data: userData, error: userError } = await supabaseAdmin
                 .from("users")
                 .select("id")
@@ -46,11 +45,6 @@ export async function POST(req: NextRequest) {
             if (userData) {
                 userId = userData.id;
             } else {
-                // In a real scenario, we'd need a real auth user, 
-                // but for seeding content, we can link to a system user or create one.
-                // Since this is for demo/liquidity, we'll assume the users table can be populated.
-                // WARNING: In Supabase, auth.users is separate. We'll skip user creation if not found
-                // and fallback to a known admin ID if provided, or just error.
                 continue;
             }
 

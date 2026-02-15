@@ -33,7 +33,6 @@ export default function OpenGraphImage() {
             borderRadius: "50%",
             background: "#25D366",
             opacity: 0.3,
-            animation: "breathing 4s ease-in-out infinite",
           }}
         />
         <div
@@ -44,7 +43,6 @@ export default function OpenGraphImage() {
             borderRadius: "50%",
             background: "#25D366",
             opacity: 0.2,
-            animation: "breathing 4s ease-in-out infinite 1s",
           }}
         />
         <div
@@ -55,7 +53,6 @@ export default function OpenGraphImage() {
             borderRadius: "50%",
             background: "#25D366",
             opacity: 0.15,
-            animation: "breathing 4s ease-in-out infinite 2s",
           }}
         />
 
@@ -170,12 +167,6 @@ export default function OpenGraphImage() {
           CampusMarket P2P
         </div>
 
-        <style>{`
-          @keyframes breathing {
-            0%, 100% { transform: scale(1); opacity: 0.2; }
-            50% { transform: scale(1.3); opacity: 0.4; }
-          }
-        `}</style>
       </div>
     ),
     {

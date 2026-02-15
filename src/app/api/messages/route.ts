@@ -179,8 +179,8 @@ export async function GET(req: Request) {
   }
 }
 
-// Get conversations list
-export async function GET_CONVERSATIONS(req: Request) {
+// Internal helper for getting conversations list
+async function getConversationsList(req: Request) {
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();

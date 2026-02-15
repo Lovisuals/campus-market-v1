@@ -5,8 +5,8 @@ const nextConfig: any = {
   trailingSlash: false,
   skipTrailingSlashRedirect: true,
   typescript: {
-    // Ignore TypeScript errors during build
-    ignoreBuildErrors: true,
+    // We want to see real errors now that we've stabilized
+    ignoreBuildErrors: false,
   },
   images: {
     remotePatterns: [
