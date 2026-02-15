@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { normalizePhoneNumber } from "@/lib/phone-validator";
+import { normalizePhoneNumber } from "@/lib/validators/phone";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -35,7 +35,7 @@ export default function RegisterPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    
+
     // Handle phone validation in real-time
     if (name === "phone") {
       if (!value.trim()) {
@@ -46,15 +46,19 @@ export default function RegisterPage() {
         return;
       }
 
-      const validation = normalizePhoneNumber(value, 'NG');
-      
-      if (validation.valid) {
-        setPhoneError("");
-        setPhoneFormatted(validation.formatted);
-        setFormData((prev) => ({ ...prev, [name]: validation.normalized }));
-      } else {
-        setPhoneError(validation.error || "Please enter a valid Nigerian phone number");
-        setFormData((prev) => ({ ...prev, [name]: value }));
+      // Allow typing, validate after 5 chars
+      setFormData((prev) => ({ ...prev, [name]: value }));
+
+      if (value.length > 5) {
+        const validation = normalizePhoneNumber(value, 'NG');
+
+        if (validation.valid) {
+          setPhoneError("");
+          setPhoneFormatted(validation.formatted);
+        } else {
+          setPhoneError(validation.error || "Please enter a valid Nigerian phone number");
+          setPhoneFormatted("");
+        }
       }
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -63,7 +67,7 @@ export default function RegisterPage() {
 
   const handleNextStep = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (step === 1 && formData.email && formData.full_name) {
       setStep(2);
     }
@@ -88,7 +92,7 @@ export default function RegisterPage() {
           data: {
             full_name: formData.full_name,
             campus: formData.campus,
-            phone: formData.phone, // Already normalized
+            phone: formData.phone ? normalizePhoneNumber(formData.phone, 'NG').normalized : '', // Normalize before submit
           },
           emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/complete-profile`,
         }
@@ -193,9 +197,8 @@ export default function RegisterPage() {
                     value={formData.phone}
                     onChange={handleChange}
                     placeholder="+234 801 234 5678"
-                    className={`w-full px-4 py-3 border-2 rounded-2xl focus:ring-2 focus:ring-wa-teal focus:border-transparent outline-none transition-all text-lg ${
-                      phoneError ? 'border-red-300 bg-red-50' : 'border-gray-200'
-                    }`}
+                    className={`w-full px-4 py-3 border-2 rounded-2xl focus:ring-2 focus:ring-wa-teal focus:border-transparent outline-none transition-all text-lg ${phoneError ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                      }`}
                   />
                   {phoneError && (
                     <p className="text-xs text-red-600 mt-2 font-semibold">⚠️ {phoneError}</p>
@@ -260,9 +263,8 @@ export default function RegisterPage() {
               <button
                 type="submit"
                 disabled={isLoading || (formData.phone && !!phoneError)}
-                className={`flex-1 py-3 bg-gradient-to-r from-wa-teal to-[#006d59] text-white font-black rounded-2xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg ${
-                  step === 1 ? "w-full" : ""
-                }`}
+                className={`flex-1 py-3 bg-gradient-to-r from-wa-teal to-[#006d59] text-white font-black rounded-2xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg ${step === 1 ? "w-full" : ""
+                  }`}
               >
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">

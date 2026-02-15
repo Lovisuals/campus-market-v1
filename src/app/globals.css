@@ -3,6 +3,11 @@
 @tailwind utilities;
 
 :root {
+  --nexus-primary: #6366f1;
+  --nexus-action: #10b981;
+  --nexus-alert: #ec4899;
+  --nexus-dark: #0f172a;
+  
   --wa-teal: #008069;
   --wa-dark-teal: #075E54;
   --wa-light: #25D366;
@@ -20,7 +25,28 @@ body.dark-mode {
   color: #e9edef;
 }
 
+/* NEXUS Dark Mode Overrides */
+html.dark body {
+  background-color: #000000; /* OLED Black */
+  color: #f8fafc;
+}
+
 @layer components {
+  /* Neo-Glass Utility */
+  .neo-glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  }
+  
+  .neo-glass-heavy {
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
   .glass-3d {
     background: rgba(255, 255, 255, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.3);

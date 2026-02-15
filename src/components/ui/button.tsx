@@ -3,7 +3,7 @@
 import React, { ReactNode } from "react";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "danger" | "ghost";
+  variant?: "primary" | "secondary" | "danger" | "ghost" | "outline";
   size?: "sm" | "md" | "lg";
   children: ReactNode;
   loading?: boolean;
@@ -19,6 +19,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       secondary: "bg-gray-100 dark:bg-[#2a3942] text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-[#3d4d57] shadow-sm",
       danger: "bg-gradient-to-r from-red-600 to-red-700 text-white hover:shadow-lg hover:shadow-red-600/30 active:scale-95",
       ghost: "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a3942]",
+      outline: "border-2 border-current bg-transparent hover:bg-gray-50 dark:hover:bg-[#2a3942] transition-colors",
     };
 
     const sizeStyles = {

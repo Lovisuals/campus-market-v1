@@ -11,12 +11,20 @@ export default {
   theme: {
     extend: {
       colors: {
-        // --- NEW WhatsApp Native Brand Colors ---
+        // --- NEXUS Brand Colors ---
+        nexus: {
+          primary: "#6366f1",   // Electric Indigo (indigo-500)
+          action: "#10b981",    // Signal Green (emerald-500)
+          alert: "#ec4899",     // Hyper-Pink (pink-500)
+          dark: "#0f172a",      // Deep Slate (slate-900)
+          glass: "rgba(255, 255, 255, 0.1)", // Glass base
+        },
+        // --- Legacy WhatsApp Colors (Preserved) ---
         wa: {
-          teal: "#008069",   // Original WhatsApp Teal
-          green: "#25D366",  // Bright Action Green
-          dark: "#075E54",   // Deep Chat Green
-          light: "#dcf8c6",  // Bubble Green
+          teal: "#008069",
+          green: "#25D366",
+          dark: "#075E54",
+          light: "#dcf8c6",
         },
         // --- Custom Background Aliases ---
         bg: {
