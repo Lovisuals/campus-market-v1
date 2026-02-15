@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
+import AlertManager from "@/components/admin/alert-manager";
 
 interface AdminListing {
   id: string;
@@ -52,7 +53,7 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"posts" | "verifications" | "users">("posts");
+  const [activeTab, setActiveTab] = useState<"posts" | "verifications" | "users" | "alerts">("posts");
 
   useEffect(() => {
     const checkAdminAndFetch = async () => {
@@ -327,6 +328,15 @@ export default function AdminDashboard() {
           >
             👥 Users
           </button>
+          <button
+            onClick={() => setActiveTab("alerts")}
+            className={`px-6 py-2 rounded-lg font-bold transition-colors ${activeTab === "alerts"
+              ? "bg-wa-teal text-white"
+              : "bg-gray-100 dark:bg-[#202c33] text-gray-600 dark:text-gray-400 hover:bg-gray-200"
+              }`}
+          >
+            📢 Site Alerts
+          </button>
         </div>
 
         {/* Posts Management Table */}
@@ -562,6 +572,17 @@ export default function AdminDashboard() {
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Site Alerts Management */}
+        {activeTab === "alerts" && (
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-[#202c33] p-6 rounded-lg border border-gray-200 dark:border-[#2a3942]">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">📢 Live Site Alerts</h2>
+              <p className="text-sm text-gray-500 mb-6">Broadcast real-time scrolling messages to all active users on the platform.</p>
+              <AlertManager />
+            </div>
           </div>
         )}
       </div>

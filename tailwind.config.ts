@@ -84,7 +84,16 @@ export default {
       },
       boxShadow: {
         'wa': '0 1px 0.5px rgba(11,20,26,.08)',
-      }
+      },
+      keyframes: {
+        ticker: {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
+      },
+      animation: {
+        ticker: 'ticker 30s linear infinite',
+      },
     },
   },
   plugins: [
