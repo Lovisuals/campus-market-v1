@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
+import { checkIsAdmin } from '@/lib/admin';
 
 export async function submitPostForApproval(
   postData: {
@@ -46,13 +47,15 @@ export async function submitPostForApproval(
 export async function getApprovalQueue(adminId: string) {
   const supabase = createClient();
 
-  const { data: isAdmin } = await supabase
+  const { data: userData } = await supabase
     .from('users')
-    .select('is_admin')
+    .select('is_admin, email, phone')
     .eq('id', adminId)
     .single();
 
-  if (!isAdmin) {
+  const isAdminUser = checkIsAdmin(userData?.email, userData?.phone, !!userData?.is_admin);
+
+  if (!isAdminUser) {
     throw new Error('Unauthorized');
   }
 

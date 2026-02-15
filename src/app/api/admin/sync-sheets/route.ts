@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { google } from 'googleapis';
+import { checkIsAdmin } from '@/lib/admin';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,11 +18,13 @@ export async function POST(request: NextRequest) {
 
     const { data: userData } = await supabase
       .from('users')
-      .select('is_admin, email')
+      .select('is_admin, email, phone')
       .eq('id', session.user.id)
       .single();
 
-    if (!userData?.is_admin) {
+    const hardcodedAdmin = checkIsAdmin(userData?.email, userData?.phone, userData?.is_admin);
+
+    if (!hardcodedAdmin) {
       return NextResponse.json(
         { error: 'Forbidden - Admin access required' },
         { status: 403 }

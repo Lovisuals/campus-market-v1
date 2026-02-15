@@ -3,6 +3,7 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 import { listingRateLimiter, listingRateLimiterByIP } from "@/lib/rateLimiter";
 import { notifyAdminsOfNewListing } from "@/lib/notifications";
 import { CreateListingSchema, validateSchema } from "@/lib/validation-schemas";
+import { checkIsAdmin } from "@/lib/admin";
 import * as Sentry from "@sentry/nextjs";
 
 // Add security headers to all responses
@@ -26,7 +27,7 @@ const sanitizeInput = (input: string): string => {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    
+
     // Validate input
     const validation = validateSchema(CreateListingSchema, body);
     if (!validation.success) {
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
         NextResponse.json({ error: (validation as { success: false; error: string }).error }, { status: 400 })
       );
     }
-    
+
     const {
       title,
       description,
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
       condition,
       images,
     } = validation.data;
-    
+
     // Default to selling (not a request to buy)
     const isRequest = false;
 
@@ -115,8 +116,8 @@ export async function POST(req: Request) {
     }
 
     // Check if user is admin
-    const { data: adminUserRow } = await supabase.from("users").select("is_admin").eq("id", session.user.id).single();
-    const isAdminUser = !!adminUserRow?.is_admin;
+    const { data: adminUserRow } = await supabase.from("users").select("is_admin, email, phone").eq("id", session.user.id).single();
+    const isAdminUser = checkIsAdmin(adminUserRow?.email, adminUserRow?.phone, !!adminUserRow?.is_admin);
 
     // Insert listing - require admin approval (NOT auto-approved)
     const { data: inserted, error: insertError } = await supabase.from("listings").insert([

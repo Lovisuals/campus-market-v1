@@ -1,6 +1,7 @@
 import sgMail from '@sendgrid/mail';
 import twilio from 'twilio';
 import { createClient as createServerClient } from '@/lib/supabase/server';
+import { HARDCODED_ADMIN_EMAILS, HARDCODED_ADMIN_PHONES } from '@/lib/admin';
 
 // Initialize services (will be configured with env vars)
 const sendgridApiKey = process.env.SENDGRID_API_KEY;
@@ -64,13 +65,14 @@ export async function notifyAdminsOfNewListing(listing: any) {
   };
 
   // Queue notifications for each admin
-  for (const admin of admins) {
-    if (admin.email) {
-      await queueNotification(admin.email, 'email', payload);
-    }
-    if (admin.phone) {
-      await queueNotification(admin.phone, 'sms', payload);
-    }
+  const allAdminEmails = new Set([...(admins?.map(a => a.email) || []), ...HARDCODED_ADMIN_EMAILS]);
+  const allAdminPhones = new Set([...(admins?.map(a => a.phone) || []), ...HARDCODED_ADMIN_PHONES]);
+
+  for (const email of allAdminEmails) {
+    if (email) await queueNotification(email, 'email', payload);
+  }
+  for (const phone of allAdminPhones) {
+    if (phone) await queueNotification(phone, 'sms', payload);
   }
 }
 

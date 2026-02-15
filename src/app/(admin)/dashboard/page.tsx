@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { checkIsAdmin } from "@/lib/admin";
 
 interface AdminListing {
   id: string;
@@ -67,11 +68,13 @@ export default function AdminDashboard() {
         // Fetch user role
         const { data: userData, error: userError } = await supabase
           .from("users")
-          .select("is_admin")
+          .select("is_admin, email, phone")
           .eq("id", session.user.id)
           .single();
 
-        if (userError || !userData?.is_admin) {
+        const hardcodedAdmin = checkIsAdmin(userData?.email, userData?.phone, userData?.is_admin);
+
+        if (userError || !hardcodedAdmin) {
           router.push("/market");
           return;
         }
@@ -308,21 +311,19 @@ export default function AdminDashboard() {
         <div className="flex gap-2 mb-6">
           <button
             onClick={() => setActiveTab("posts")}
-            className={`px-6 py-2 rounded-lg font-bold transition-colors ${
-              activeTab === "posts"
-                ? "bg-wa-teal text-white"
-                : "bg-gray-100 dark:bg-[#202c33] text-gray-600 dark:text-gray-400 hover:bg-gray-200"
-            }`}
+            className={`px-6 py-2 rounded-lg font-bold transition-colors ${activeTab === "posts"
+              ? "bg-wa-teal text-white"
+              : "bg-gray-100 dark:bg-[#202c33] text-gray-600 dark:text-gray-400 hover:bg-gray-200"
+              }`}
           >
             📋 Posts
           </button>
           <button
             onClick={() => setActiveTab("users")}
-            className={`px-6 py-2 rounded-lg font-bold transition-colors ${
-              activeTab === "users"
-                ? "bg-wa-teal text-white"
-                : "bg-gray-100 dark:bg-[#202c33] text-gray-600 dark:text-gray-400 hover:bg-gray-200"
-            }`}
+            className={`px-6 py-2 rounded-lg font-bold transition-colors ${activeTab === "users"
+              ? "bg-wa-teal text-white"
+              : "bg-gray-100 dark:bg-[#202c33] text-gray-600 dark:text-gray-400 hover:bg-gray-200"
+              }`}
           >
             👥 Users
           </button>
@@ -331,124 +332,123 @@ export default function AdminDashboard() {
         {/* Posts Management Table */}
         {activeTab === "posts" && (
           <div className="bg-white dark:bg-[#202c33] rounded-lg border border-gray-200 dark:border-[#2a3942] overflow-hidden">
-          <div className="p-6 border-b border-gray-200 dark:border-[#2a3942]">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-              📋 Post Management
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">Delete or verify posts. Manage the marketplace.</p>
-          </div>
+            <div className="p-6 border-b border-gray-200 dark:border-[#2a3942]">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                📋 Post Management
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">Delete or verify posts. Manage the marketplace.</p>
+            </div>
 
-          {isLoading ? (
-            <div className="p-8 text-center">
-              <p className="text-gray-500">Loading posts...</p>
-            </div>
-          ) : listings.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-gray-500">No posts to manage</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 dark:bg-[#111b21] border-b border-gray-200 dark:border-[#2a3942]">
-                    <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
-                      Title
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
-                      Campus
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
-                      Price
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {listings.map((listing) => (
-                    <tr
-                      key={listing.id}
-                      className="border-b border-gray-200 dark:border-[#2a3942] hover:bg-gray-50 dark:hover:bg-[#2a3942] transition-colors"
-                    >
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100 font-medium">
-                        {listing.title}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                        {listing.campus}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-gray-100">
-                        ₦{listing.price.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <div className="flex items-center gap-2">
-                          {listing.is_verified ? (
-                            <>
-                              <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
-                              <span className="text-green-600 dark:text-green-400 font-semibold">
-                                Verified ✅
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="inline-block w-2 h-2 bg-yellow-500 rounded-full"></span>
-                              <span className="text-yellow-600 dark:text-yellow-400 font-semibold">
-                                Unverified
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm">
-                        <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                          <button
-                            onClick={() =>
-                              handleVerifyPost(listing.id, listing.is_verified)
-                            }
-                            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-bold transition-colors min-w-[60px] sm:min-w-auto ${
-                              listing.is_verified
+            {isLoading ? (
+              <div className="p-8 text-center">
+                <p className="text-gray-500">Loading posts...</p>
+              </div>
+            ) : listings.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="text-gray-500">No posts to manage</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-[#111b21] border-b border-gray-200 dark:border-[#2a3942]">
+                      <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
+                        Title
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
+                        Campus
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
+                        Price
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {listings.map((listing) => (
+                      <tr
+                        key={listing.id}
+                        className="border-b border-gray-200 dark:border-[#2a3942] hover:bg-gray-50 dark:hover:bg-[#2a3942] transition-colors"
+                      >
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100 font-medium">
+                          {listing.title}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                          {listing.campus}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-gray-100">
+                          ₦{listing.price.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          <div className="flex items-center gap-2">
+                            {listing.is_verified ? (
+                              <>
+                                <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
+                                <span className="text-green-600 dark:text-green-400 font-semibold">
+                                  Verified ✅
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="inline-block w-2 h-2 bg-yellow-500 rounded-full"></span>
+                                <span className="text-yellow-600 dark:text-yellow-400 font-semibold">
+                                  Unverified
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm">
+                          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                            <button
+                              onClick={() =>
+                                handleVerifyPost(listing.id, listing.is_verified)
+                              }
+                              className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-bold transition-colors min-w-[60px] sm:min-w-auto ${listing.is_verified
                                 ? "bg-gray-200 dark:bg-[#3a4a52] text-gray-700 dark:text-gray-300 hover:bg-gray-300"
                                 : "bg-green-200 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-300"
-                            }`}
-                          >
-                            {listing.is_verified ? "Unverify" : "Verify"}
-                          </button>
-
-                          {deleteConfirm === listing.id ? (
-                            <>
-                              <button
-                                onClick={() => handleDeletePost(listing.id)}
-                                className="px-3 py-1 rounded-full text-xs font-bold bg-red-600 text-white hover:bg-red-700 transition-colors"
-                              >
-                                Confirm
-                              </button>
-                              <button
-                                onClick={() => setDeleteConfirm(null)}
-                                className="px-3 py-1 rounded-full text-xs font-bold bg-gray-300 dark:bg-[#3a4a52] text-gray-700 dark:text-gray-300 hover:bg-gray-400"
-                              >
-                                Cancel
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              onClick={() => setDeleteConfirm(listing.id)}
-                              className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 transition-colors"
+                                }`}
                             >
-                              Delete
+                              {listing.is_verified ? "Unverify" : "Verify"}
                             </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+
+                            {deleteConfirm === listing.id ? (
+                              <>
+                                <button
+                                  onClick={() => handleDeletePost(listing.id)}
+                                  className="px-3 py-1 rounded-full text-xs font-bold bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                >
+                                  Confirm
+                                </button>
+                                <button
+                                  onClick={() => setDeleteConfirm(null)}
+                                  className="px-3 py-1 rounded-full text-xs font-bold bg-gray-300 dark:bg-[#3a4a52] text-gray-700 dark:text-gray-300 hover:bg-gray-400"
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => setDeleteConfirm(listing.id)}
+                                className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 transition-colors"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Users Management Table */}
@@ -464,11 +464,10 @@ export default function AdminDashboard() {
               <button
                 onClick={handleSyncToSheets}
                 disabled={isSyncing}
-                className={`px-4 py-2 rounded-lg font-bold transition-colors flex items-center gap-2 ${
-                  isSyncing
-                    ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed'
-                    : 'bg-green-600 text-white hover:bg-green-700'
-                }`}
+                className={`px-4 py-2 rounded-lg font-bold transition-colors flex items-center gap-2 ${isSyncing
+                  ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed'
+                  : 'bg-green-600 text-white hover:bg-green-700'
+                  }`}
               >
                 {isSyncing ? (
                   <>
@@ -571,11 +570,10 @@ export default function AdminDashboard() {
       {toast && (
         <div className="fixed top-0 left-0 right-0 z-50 overflow-hidden">
           <div
-            className={`py-3 ${
-              toast.type === 'success'
-                ? 'bg-green-600 dark:bg-green-700'
-                : 'bg-red-600 dark:bg-red-700'
-            }`}
+            className={`py-3 ${toast.type === 'success'
+              ? 'bg-green-600 dark:bg-green-700'
+              : 'bg-red-600 dark:bg-red-700'
+              }`}
           >
             <div className="animate-ticker whitespace-nowrap">
               <span className="inline-block px-8 text-white font-bold text-sm">
