@@ -4,6 +4,7 @@ import { SendMessageSchema, validateSchema } from '@/lib/validation-schemas';
 import { logSecurityEvent } from '@/lib/audit-logger';
 import { moderateContent, checkUserBanStatus } from '@/lib/content-moderation';
 import { encryptMessage } from '@/lib/message-encryption';
+import { detectContactInfo } from '@/lib/security/chat-guard';
 import * as Sentry from '@sentry/nextjs';
 
 // Send message
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    
+
     // Validate input
     const validation = validateSchema(SendMessageSchema, body);
     if (!validation.success) {
@@ -58,6 +59,17 @@ export async function POST(req: Request) {
 
     // Content moderation
     const moderation = await moderateContent(content, 'message');
+
+    // [NEXUS SECURITY] Check for Contact Info (Phone/Email)
+    const securityCheck = detectContactInfo(content);
+    if (securityCheck.detected) {
+      await logSecurityEvent(user.id, 'policy_violation',
+        { reason: `Contact info sharing attempted: ${securityCheck.reason}` }, req);
+      return NextResponse.json({
+        error: securityCheck.reason
+      }, { status: 400 }); // Return 400 Bad Request directly
+    }
+
     if (moderation.autoBlock) {
       await logSecurityEvent(user.id, 'suspicious_activity',
         { reason: `Message auto-blocked: ${moderation.reasons.join(', ')}` }, req);
@@ -196,7 +208,7 @@ export async function GET_CONVERSATIONS(req: Request) {
 
     // Group by conversation partner and get latest message
     const conversationMap = new Map();
-    
+
     conversations?.forEach(msg => {
       const partnerId = msg.sender_id === user.id ? msg.recipient_id : msg.sender_id;
       if (!conversationMap.has(partnerId)) {

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Home, MapPin, Sparkles, Wallet, Users, Plus, MessageCircle } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { CreateListingModal } from "@/components/post/create-listing-modal";
 import { GuestGateModal } from "@/components/auth/guest-gate-modal";
@@ -18,6 +18,7 @@ const navItems = [
 
 export function BottomFabricNav() {
     const pathname = usePathname();
+    const router = useRouter();
     const [showListingModal, setShowListingModal] = useState(false);
     const [showGuestGate, setShowGuestGate] = useState(false);
     const [gateFeature, setGateFeature] = useState("");
@@ -62,12 +63,10 @@ export function BottomFabricNav() {
                                 href={item.href}
                                 onClick={(e) => {
                                     if (item.id === "messages" || item.id === "squad") {
-                                        // Optional: Gate these too if desired, currently only gating Post
-                                        // e.preventDefault();
-                                        // handleProtectedAction(item.label, () => router.push(item.href));
+                                        e.preventDefault();
+                                        handleProtectedAction(item.label, () => router.push(item.href));
                                     }
-                                }}
-                                className="flex-1 flex flex-col items-center justify-center py-2"
+                                }} className="flex-1 flex flex-col items-center justify-center py-2"
                             >
                                 <div
                                     className={cn(

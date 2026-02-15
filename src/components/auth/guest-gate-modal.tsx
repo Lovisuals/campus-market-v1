@@ -40,14 +40,14 @@ export function GuestGateModal({ isOpen, onClose, featureName = "this feature" }
                 </p>
 
                 <div className="space-y-3">
-                    <Link href="/register" className="block">
+                    <Link href="/register" className="block" onClick={onClose}>
                         <Button className="w-full bg-nexus-primary hover:bg-indigo-500 text-white font-bold h-12 rounded-xl">
                             Create Student ID
                             <ArrowRight className="w-4 h-4 ml-2" />
                         </Button>
                     </Link>
 
-                    <Link href="/login" className="block">
+                    <Link href="/login" className="block" onClick={onClose}>
                         <Button variant="ghost" className="w-full text-gray-400 hover:text-white">
                             I already have an account
                         </Button>
