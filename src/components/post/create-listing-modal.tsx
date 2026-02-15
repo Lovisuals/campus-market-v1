@@ -4,6 +4,8 @@ import React, { useState, useRef } from "react";
 import { X, Upload, Camera, DollarSign, Tag, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
+import { createListing } from "@/app/actions/listings";
 
 interface CreateListingModalProps {
     isOpen: boolean;
@@ -13,12 +15,14 @@ interface CreateListingModalProps {
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 
 export function CreateListingModal({ isOpen, onClose }: CreateListingModalProps) {
+    const { toast } = useToast();
     const [images, setImages] = useState<File[]>([]);
     const [title, setTitle] = useState("");
     const [price, setPrice] = useState("");
     const [description, setDescription] = useState("");
     const [listingType, setListingType] = useState<'sell' | 'buy'>('sell');
     const [isAnonymous, setIsAnonymous] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     if (!isOpen) return null;
@@ -35,11 +39,72 @@ export function CreateListingModal({ isOpen, onClose }: CreateListingModalProps)
         setImages(prev => [...prev, ...validFiles].slice(0, 3)); // Max 3 images
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        // TODO: Connect to actual upload logic
-        alert("Listing created! (Mock)");
-        onClose();
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault(); // Prevent default form submission
+        setIsSubmitting(true);
+
+        if (!title || !price) {
+            toast({ title: "Missing Fields", description: "Please fill in title and price.", variant: "destructive" });
+            setIsSubmitting(false);
+            return;
+        }
+
+        try {
+            // 1. Create Listing via Server Action
+            // TODO: Implement real image upload and pass URLs. For now passing empty.
+            const result = await createListing({
+                title,
+                description,
+                price,
+                category: "General", // Default for now
+                listingType,
+                isAnonymous,
+                images: [] // Placeholder
+            });
+
+            if (result.error || !result.listing) {
+                throw new Error(result.error || "Failed to create listing");
+            }
+
+            // 2. Handle Payment for Anonymous Posts
+            if (isAnonymous) {
+                toast({ title: "Redirecting...", description: "Initiating Paystack Secure Payment..." });
+
+                const payRes = await fetch('/api/payments/initialize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: "user@example.com", // Should be user's email
+                        amount: 500, // ₦500
+                        purpose: 'anonymous_post_fee',
+                        listing_id: result.listing.id // Link Payment to Listing
+                    })
+                });
+
+                const payData = await payRes.json();
+
+                if (payData.authorization_url) {
+                    window.location.href = payData.authorization_url;
+                    return; // Stop execution, redirecting
+                } else {
+                    throw new Error("Payment init failed");
+                }
+            }
+
+            // 3. Success (Standard Post)
+            onClose();
+            toast({
+                title: "Posted Successfully!",
+                description: "Your listing is now live.",
+                className: "bg-green-600 text-white border-none"
+            });
+
+        } catch (error: any) {
+            console.error(error);
+            toast({ title: "Error", description: error.message, variant: "destructive" });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (

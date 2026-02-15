@@ -32,7 +32,8 @@ export default function MarketPage() {
           .from("listings")
           .select("*")
           .eq("is_approved", true)
-          .eq("status", "active");
+          .eq("status", "active")
+          .eq("visibility", "public");
 
         if (activeCampus !== "All") {
           query = query.eq("campus", activeCampus);
@@ -150,9 +151,8 @@ export default function MarketPage() {
                 <button
                   key={idx}
                   onClick={() => setCurrentBroadcastIndex(idx)}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    idx === currentBroadcastIndex ? "bg-white w-6" : "bg-white/50"
-                  }`}
+                  className={`w-2 h-2 rounded-full transition-all ${idx === currentBroadcastIndex ? "bg-white w-6" : "bg-white/50"
+                    }`}
                 />
               ))}
             </div>
@@ -194,21 +194,19 @@ export default function MarketPage() {
           <div className="flex gap-2 mb-4">
             <button
               onClick={() => setViewMode("all")}
-              className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${
-                viewMode === "all"
-                  ? "bg-wa-teal text-white"
-                  : "bg-gray-100 dark:bg-[#2a3942] text-gray-700 dark:text-gray-300"
-              }`}
+              className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${viewMode === "all"
+                ? "bg-wa-teal text-white"
+                : "bg-gray-100 dark:bg-[#2a3942] text-gray-700 dark:text-gray-300"
+                }`}
             >
               All Items
             </button>
             <button
               onClick={() => setViewMode("requests")}
-              className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${
-                viewMode === "requests"
-                  ? "bg-[#8E44AD] text-white"
-                  : "bg-gray-100 dark:bg-[#2a3942] text-gray-700 dark:text-gray-300"
-              }`}
+              className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${viewMode === "requests"
+                ? "bg-[#8E44AD] text-white"
+                : "bg-gray-100 dark:bg-[#2a3942] text-gray-700 dark:text-gray-300"
+                }`}
             >
               Requests
             </button>
@@ -222,11 +220,10 @@ export default function MarketPage() {
           <button
             key={campus}
             onClick={() => setActiveCampus(campus)}
-            className={`snap-center flex-shrink-0 px-4 py-2 rounded-full font-bold text-sm whitespace-nowrap transition-all ${
-              activeCampus === campus
-                ? "bg-wa-teal text-white shadow-md shadow-green-200 dark:shadow-none"
-                : "bg-white dark:bg-[#202c33] text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-[#2a3942]"
-            }`}
+            className={`snap-center flex-shrink-0 px-4 py-2 rounded-full font-bold text-sm whitespace-nowrap transition-all ${activeCampus === campus
+              ? "bg-wa-teal text-white shadow-md shadow-green-200 dark:shadow-none"
+              : "bg-white dark:bg-[#202c33] text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-[#2a3942]"
+              }`}
           >
             {campus}
           </button>
@@ -249,14 +246,20 @@ export default function MarketPage() {
             {listings.map((listing) => (
               <div
                 key={listing.id}
-                className={`bg-white dark:bg-[#202c33] rounded-lg overflow-hidden border transition-all ${
-                  listing.is_verified
-                    ? "border-green-400 dark:border-green-500 shadow-lg shadow-green-200 dark:shadow-green-900"
-                    : "border-gray-100 dark:border-[#2a3942]"
-                } hover:shadow-md`}
+                className={`bg-white dark:bg-[#202c33] rounded-lg overflow-hidden border transition-all ${listing.is_verified
+                  ? "border-green-400 dark:border-green-500 shadow-lg shadow-green-200 dark:shadow-green-900"
+                  : "border-gray-100 dark:border-[#2a3942]"
+                  } hover:shadow-md`}
               >
                 <div className="p-4 space-y-3">
                   {/* Verification Badge */}
+                  <div
+                    onClick={() => router.push(`/profile?id=${listing.seller_id}`)}
+                    className="cursor-pointer hover:opacity-80 flex items-center gap-2 mb-2"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-wa-teal flex items-center justify-center text-sm">👤</div>
+                    <span className="text-sm font-bold text-gray-700 dark:text-gray-300">View Profile</span>
+                  </div>
                   {listing.is_verified && (
                     <div className="flex items-center gap-2 px-3 py-1 bg-green-100 dark:bg-green-900/30 rounded-full w-fit">
                       <span className="text-sm font-bold text-green-700 dark:text-green-400">✅ Verified</span>

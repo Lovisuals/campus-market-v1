@@ -189,7 +189,7 @@ export default function RegisterPage() {
                 {/* Phone (Optional) */}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-3">
-                    📱 Phone Number (Optional)
+                    📱 Phone Number (Mandatory)
                   </label>
                   <input
                     type="tel"
@@ -199,6 +199,7 @@ export default function RegisterPage() {
                     placeholder="+234 801 234 5678"
                     className={`w-full px-4 py-3 border-2 rounded-2xl focus:ring-2 focus:ring-wa-teal focus:border-transparent outline-none transition-all text-lg ${phoneError ? 'border-red-300 bg-red-50' : 'border-gray-200'
                       }`}
+                    required
                   />
                   {phoneError && (
                     <p className="text-xs text-red-600 mt-2 font-semibold">⚠️ {phoneError}</p>
