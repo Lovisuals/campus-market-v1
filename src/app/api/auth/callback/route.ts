@@ -13,28 +13,52 @@ export async function GET(request: NextRequest) {
     try {
       const supabase = await createClient();
       const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-      
+
       console.log('Exchange result:', { hasData: !!data, error: error?.message });
-      
+
       if (!error && data.session) {
-        // Check if user has completed profile
+        const user = data.session.user;
+        const deviceHash = requestUrl.searchParams.get('device');
+
+        // 1. Fetch user data
         const { data: userData } = await supabase
           .from('users')
-          .select('phone, phone_verified')
-          .eq('id', data.session.user.id)
+          .select('id, email, phone, is_admin, phone_verified')
+          .eq('id', user.id)
           .single();
 
-        console.log('User data:', userData);
+        // 2. Admin Recognition & Device Secret Logic
+        const { checkIsAdmin } = await import('@/lib/admin');
+        const isAdmin = checkIsAdmin(userData?.email, userData?.phone, userData?.is_admin);
 
-        // Redirect to complete-profile if phone not set
-        if (!userData?.phone || !userData?.phone_verified) {
-          return NextResponse.redirect(new URL('/complete-profile', request.url));
+        let redirectSuffix = "";
+        if (isAdmin && deviceHash) {
+          const crypto = await import('crypto');
+          const secret = crypto.randomBytes(32).toString('hex');
+
+          // Register/Update device secret
+          // Note: We'll use the IP from the request if possible, 
+          // but for now we'll match on user_id + device_hash
+          await supabase
+            .from('user_devices')
+            .upsert({
+              user_id: user.id,
+              device_hash: deviceHash,
+              device_secret: secret,
+              last_login: new Date().toISOString()
+            }, { onConflict: 'user_id, device_hash' });
+
+          redirectSuffix = `?setup_admin=${secret}`;
         }
-        
-        // Otherwise go to market
-        return NextResponse.redirect(new URL(next, request.url));
+
+        // 3. Normal Redirect Logic
+        if (!userData?.phone || !userData?.phone_verified) {
+          return NextResponse.redirect(new URL(`/complete-profile${redirectSuffix}`, request.url));
+        }
+
+        return NextResponse.redirect(new URL(`${next}${redirectSuffix}`, request.url));
       }
-      
+
       console.error('Auth error:', error);
     } catch (err) {
       console.error('Callback error:', err);

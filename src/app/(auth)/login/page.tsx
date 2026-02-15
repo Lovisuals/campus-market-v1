@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { normalizePhoneNumber } from "@/lib/phone-validator";
@@ -32,6 +32,23 @@ export default function LoginPage() {
   const [isRecognized, setIsRecognized] = useState(false);
   const [displayEmail, setDisplayEmail] = useState("");
   const [cooldown, setCooldown] = useState(0);
+  const [isAdminMode, setIsAdminMode] = useState(false);
+  const pressTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const handleAdminTriggerStart = () => {
+    pressTimer.current = setTimeout(() => {
+      setIsAdminMode(true);
+      setError("Admin Protocol Activated 🛡️");
+      setTimeout(() => setError(null), 3000);
+    }, 2500); // 2.5 seconds long press
+  };
+
+  const handleAdminTriggerEnd = () => {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -54,8 +71,35 @@ export default function LoginPage() {
       let emailToUse = identifier;
       const isActuallyEmail = identifier.includes("@");
 
+      if (isAdminMode) {
+        // Admin Login Flow
+        const phoneValidation = normalizePhoneNumber(identifier, 'NG');
+        if (!phoneValidation.valid) throw new Error("Please enter a valid admin phone number.");
+
+        // Check for device recognition
+        const deviceHash = await hashString(navigator.userAgent);
+        const ipHash = await getIPHash();
+        const deviceSecret = localStorage.getItem("nexus_admin_secret");
+
+        if (deviceSecret) {
+          // Attempt Quick Login
+          const response = await fetch("/api/auth/admin-quick-login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone: phoneValidation.normalized, deviceHash, ipHash, deviceSecret }),
+          });
+
+          const result = await response.json();
+          if (response.ok && result.redirectUrl) {
+            window.location.href = result.redirectUrl;
+            return;
+          }
+          // Fallback to OTP if quick login fails
+        }
+      }
+
       if (!isActuallyEmail) {
-        // Assume it's a phone number
+        // ... existing phone logic ...
         const phoneValidation = normalizePhoneNumber(identifier, 'NG');
         if (!phoneValidation.valid) {
           throw new Error("Please enter a valid email or Nigerian phone number.");
@@ -95,12 +139,15 @@ export default function LoginPage() {
       }
 
       // Use Supabase's built-in email OTP
+      const deviceHash = await hashString(navigator.userAgent);
       const { error } = await supabase.auth.signInWithOtp({
         email: emailToUse,
         options: {
-          emailRedirectTo: `${window.location.origin}/api/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/api/auth/callback?device=${deviceHash}`,
         }
       });
+
+      if (error) throw error;
 
       setOtpSent(true);
       setCooldown(60); // 1 minute cooldown
@@ -163,25 +210,31 @@ export default function LoginPage() {
             <>
               {/* Title */}
               <div className="text-center">
-                <h2 className="text-xl sm:text-2xl font-black text-gray-900 mb-2">Welcome back</h2>
-                <p className="text-gray-600 text-sm">Sign in with phone or email</p>
+                <h2 className="text-xl sm:text-2xl font-black text-gray-900 mb-2">
+                  {isAdminMode ? "🛡️ Admin Access" : "Welcome back"}
+                </h2>
+                <p className="text-gray-600 text-sm">
+                  {isAdminMode ? "Enter authorized admin phone" : "Sign in with phone or email"}
+                </p>
               </div>
 
               {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-3">
-                    📱 Phone or 📧 Email
+                    {isAdminMode ? "📱 Admin Phone" : "📱 Phone or 📧 Email"}
                   </label>
                   <input
                     type="text"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="080123... or you@campus.edu"
+                    placeholder={isAdminMode ? "080..." : "080123... or you@campus.edu"}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-wa-teal focus:border-transparent outline-none transition-all text-lg"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-2">Enter your number for the fastest experience</p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {isAdminMode ? "Admin authorization required" : "Enter your number for the fastest experience"}
+                  </p>
                 </div>
 
                 {error && (
@@ -216,7 +269,15 @@ export default function LoginPage() {
           {/* Divider */}
           <div className="flex items-center gap-3">
             <div className="flex-1 h-px bg-gray-200"></div>
-            <span className="text-xs text-gray-500 font-semibold">OR</span>
+            <span
+              onMouseDown={handleAdminTriggerStart}
+              onMouseUp={handleAdminTriggerEnd}
+              onTouchStart={handleAdminTriggerStart}
+              onTouchEnd={handleAdminTriggerEnd}
+              className="text-xs text-gray-500 font-semibold select-none cursor-default py-2"
+            >
+              OR
+            </span>
             <div className="flex-1 h-px bg-gray-200"></div>
           </div>
 

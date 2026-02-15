@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { MobileBridge } from "@/components/mobile/mobile-bridge";
 import Script from "next/script";
 import LiveTicker from "@/components/layout/live-ticker";
+import { AdminSetup } from "@/components/auth/AdminSetup";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -55,6 +56,7 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
+            <AdminSetup />
             <LiveTicker />
             {/* Main Content Area - The Stream resides here */}
             <main className="flex-grow relative z-0">
