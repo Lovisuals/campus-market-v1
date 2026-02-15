@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import { Suspense } from "react";
 import { ThemeProvider } from "next-themes";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BottomFabricNav } from "@/components/layout/bottom-fabric-nav";
@@ -56,7 +57,9 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <AdminSetup />
+            <Suspense fallback={null}>
+              <AdminSetup />
+            </Suspense>
             <LiveTicker />
             {/* Main Content Area - The Stream resides here */}
             <main className="flex-grow relative z-0">
