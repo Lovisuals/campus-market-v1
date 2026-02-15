@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { type NextRequest } from 'next/server';
+import { checkIsAdmin } from '@/lib/admin';
+import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -28,12 +30,10 @@ export async function GET(request: NextRequest) {
           .single();
 
         // 2. Admin Recognition & Device Secret Logic
-        const { checkIsAdmin } = await import('@/lib/admin');
         const isAdmin = checkIsAdmin(userData?.email, userData?.phone, userData?.is_admin);
 
         let redirectSuffix = "";
         if (isAdmin && deviceHash) {
-          const crypto = await import('crypto');
           const secret = crypto.randomBytes(32).toString('hex');
 
           // Register/Update device secret
