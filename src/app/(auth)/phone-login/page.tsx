@@ -70,7 +70,6 @@ export default function PhoneLoginPage() {
         const { error: signInError } = await supabase.auth.signInWithOtp({
           email: userData.email,
           options: {
-            shouldCreateUser: false,
             emailRedirectTo: `${window.location.origin}/api/auth/callback`,
           }
         });
@@ -84,7 +83,7 @@ export default function PhoneLoginPage() {
 
       // Device/IP not recognized - send OTP
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-      
+
       // Store OTP in database
       const { error: otpError } = await supabase
         .from("otp_sessions")
@@ -194,7 +193,6 @@ export default function PhoneLoginPage() {
       const { error: magicLinkError } = await supabase.auth.signInWithOtp({
         email: userEmailData.email,
         options: {
-          shouldCreateUser: false,
           emailRedirectTo: `${window.location.origin}/api/auth/callback`,
         }
       });
