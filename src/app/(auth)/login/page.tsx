@@ -1,25 +1,86 @@
-"use client";
-
-import { useState } from "react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { normalizePhoneNumber } from "@/lib/phone-validator";
+
+async function hashString(str: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function getIPHash(): Promise<string> {
+  try {
+    const response = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
+    const { ip } = await response.json();
+    return await hashString(ip);
+  } catch {
+    return await hashString('unknown');
+  }
+}
 
 export default function LoginPage() {
   const supabase = createClient();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState(""); // Email or Phone
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(false);
+  const [isRecognized, setIsRecognized] = useState(false);
+  const [displayEmail, setDisplayEmail] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setIsRecognized(false);
 
     try {
-      // Use Supabase's built-in email OTP (no external service needed)
+      let emailToUse = identifier;
+      const isActuallyEmail = identifier.includes("@");
+
+      if (!isActuallyEmail) {
+        // Assume it's a phone number
+        const phoneValidation = normalizePhoneNumber(identifier, 'NG');
+        if (!phoneValidation.valid) {
+          throw new Error("Please enter a valid email or Nigerian phone number.");
+        }
+
+        // Find user by phone number
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("id, email")
+          .eq("phone", phoneValidation.normalized)
+          .single();
+
+        if (userError || !userData) {
+          throw new Error("Account not found with this phone number. Please register first.");
+        }
+
+        emailToUse = userData.email;
+        setDisplayEmail(userData.email);
+
+        // Check for device recognition
+        const deviceHash = await hashString(navigator.userAgent);
+        const ipHash = await getIPHash();
+
+        const { data: deviceData, error: deviceError } = await supabase
+          .from("user_devices")
+          .select("id")
+          .eq("user_id", userData.id)
+          .eq("device_hash", deviceHash)
+          .eq("ip_hash", ipHash)
+          .single();
+
+        if (deviceData && !deviceError) {
+          setIsRecognized(true);
+        }
+      } else {
+        setDisplayEmail(identifier);
+      }
+
+      // Use Supabase's built-in email OTP
       const { error } = await supabase.auth.signInWithOtp({
-        email: email,
+        email: emailToUse,
         options: {
           emailRedirectTo: `${window.location.origin}/api/auth/callback`,
         }
@@ -53,23 +114,28 @@ export default function LoginPage() {
             /* OTP Sent Success */
             <div className="text-center space-y-4">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-                <span className="text-3xl">✅</span>
+                <span className="text-3xl">{isRecognized ? "🤝" : "✅"}</span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-black text-gray-900">Check your email!</h2>
+              <h2 className="text-xl sm:text-2xl font-black text-gray-900">
+                {isRecognized ? "Device Recognized!" : "Check your email!"}
+              </h2>
               <p className="text-gray-600 text-sm">
-                We've sent a magic link to <strong>{email}</strong>
+                We've sent a magic link to <strong>{displayEmail}</strong>
               </p>
-              <p className="text-gray-500 text-xs">
-                Click the link in your email to sign in. The link will expire in 1 hour.
+              <p className="text-gray-500 text-xs italic">
+                {isRecognized
+                  ? "Since we know this device, you're almost in. Just click the link in your email."
+                  : "Click the link in your email to sign in. The link will expire in 1 hour."}
               </p>
               <button
                 onClick={() => {
                   setOtpSent(false);
-                  setEmail("");
+                  setIdentifier("");
+                  setIsRecognized(false);
                 }}
                 className="text-wa-teal font-bold text-sm hover:underline"
               >
-                Use different email
+                Use different account
               </button>
             </div>
           ) : (
@@ -77,24 +143,24 @@ export default function LoginPage() {
               {/* Title */}
               <div className="text-center">
                 <h2 className="text-xl sm:text-2xl font-black text-gray-900 mb-2">Welcome back</h2>
-                <p className="text-gray-600 text-sm">Sign in with your email to continue</p>
+                <p className="text-gray-600 text-sm">Sign in with phone or email</p>
               </div>
 
               {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-3">
-                    📧 Email Address
+                    📱 Phone or 📧 Email
                   </label>
                   <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@campus.edu"
+                    type="text"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="080123... or you@campus.edu"
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-wa-teal focus:border-transparent outline-none transition-all text-lg"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-2">We'll send you a magic link to sign in</p>
+                  <p className="text-xs text-gray-500 mt-2">Enter your number for the fastest experience</p>
                 </div>
 
                 {error && (
@@ -140,7 +206,7 @@ export default function LoginPage() {
               href="/register"
               className="inline-block w-full py-3 bg-gray-100 hover:bg-gray-200 text-wa-teal font-black rounded-2xl transition-colors"
             >
-              Create Account
+              Get Started
             </Link>
           </div>
 
