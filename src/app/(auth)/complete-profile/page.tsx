@@ -30,7 +30,7 @@ export default function CompleteProfilePage() {
   useEffect(() => {
     const checkProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         router.push("/login");
         return;
@@ -80,11 +80,17 @@ export default function CompleteProfilePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Get IP address for device tracking
-      const ipResponse = await fetch('https://api.ipify.org?format=json');
-      const { ip } = await ipResponse.json();
+      // Get IP address for device tracking (Optional fallback)
+      let userIp = 'unknown';
+      try {
+        const ipResponse = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
+        const { ip } = await ipResponse.json();
+        userIp = ip;
+      } catch (ipErr) {
+        console.warn("IP tracking service unreachable, skipping IP log:", ipErr);
+      }
 
-      // Update user record with phone number and IP hash
+      // Update user record with phone number
       const { error: updateError } = await supabase
         .from("users")
         .update({
@@ -96,21 +102,34 @@ export default function CompleteProfilePage() {
         })
         .eq("id", user.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        if (updateError.code === "23505") {
+          throw new Error("This phone number is already linked to another account.");
+        }
+        throw updateError;
+      }
 
-      // Store IP hash for security tracking
-      const ipHash = await hashString(ip);
-      await supabase.from("user_devices").insert({
-        user_id: user.id,
-        ip_hash: ipHash,
-        phone: phoneValidation.normalized,
-        created_at: new Date().toISOString(),
-      });
+      // Store device hash (Non-blocking)
+      try {
+        const ipHash = await hashString(userIp);
+        const deviceHash = await hashString(navigator.userAgent);
+
+        await supabase.from("user_devices").insert({
+          user_id: user.id,
+          ip_hash: ipHash,
+          phone: phoneValidation.normalized,
+          device_hash: deviceHash,
+          created_at: new Date().toISOString(),
+        });
+      } catch (deviceLogErr) {
+        console.error("Failed to log device info:", deviceLogErr);
+      }
 
       // Redirect to market
       router.push("/market");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update profile");
+    } catch (err: any) {
+      console.error("Profile Update Failure:", err);
+      setError(err.message || "Failed to update profile. Please check your internet connection.");
     } finally {
       setIsLoading(false);
     }
@@ -144,7 +163,7 @@ export default function CompleteProfilePage() {
           <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl">
             <p className="text-sm text-blue-700">
               <strong>🔐 Why phone number?</strong><br />
-              Your phone number is used to verify your identity and secure your account. 
+              Your phone number is used to verify your identity and secure your account.
               You'll use it to login next time.
             </p>
           </div>
