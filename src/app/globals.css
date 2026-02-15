@@ -3,9 +3,9 @@
 @tailwind utilities;
 
 :root {
-  --nexus-primary: #6366f1;
-  --nexus-action: #10b981;
-  --nexus-alert: #ec4899;
+  --nexus-primary: #008069;
+  --nexus-action: #25D366;
+  --nexus-alert: #df3333;
   --nexus-dark: #0f172a;
 
   --wa-teal: #008069;

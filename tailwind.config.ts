@@ -13,11 +13,11 @@ export default {
       colors: {
         // --- NEXUS Brand Colors ---
         nexus: {
-          primary: "#6366f1",   // Electric Indigo (indigo-500)
-          action: "#10b981",    // Signal Green (emerald-500)
-          alert: "#ec4899",     // Hyper-Pink (pink-500)
-          dark: "#0f172a",      // Deep Slate (slate-900)
-          glass: "rgba(255, 255, 255, 0.1)", // Glass base
+          primary: "#008069",   // WhatsApp Teal
+          action: "#25D366",    // WhatsApp Green
+          alert: "#df3333",     // Urgent Red
+          dark: "#0f172a",      // Deep Slate
+          glass: "rgba(255, 255, 255, 0.1)",
         },
         // --- Legacy WhatsApp Colors (Preserved) ---
         wa: {

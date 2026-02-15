@@ -10,10 +10,10 @@ import { GuestGateModal } from "@/components/auth/guest-gate-modal";
 
 const navItems = [
     { id: "stream", label: "For You", icon: Home, href: "/" },
-    { id: "nearby", label: "Nearby", icon: MapPin, href: "/nearby" },
+    { id: "discovery", label: "Campus Map", icon: MapPin, href: "/nearby" },
     { id: "post", label: "Sell", icon: Plus, href: "#", isFab: true }, // Centered FAB
     { id: "messages", label: "Chat", icon: MessageCircle, href: "/chats" },
-    { id: "squad", label: "Squad", icon: Users, href: "/squad" },
+    { id: "group_buy", label: "Group Buy", icon: Users, href: "/squad" },
 ];
 
 export function BottomFabricNav() {
@@ -23,11 +23,30 @@ export function BottomFabricNav() {
     const [showGuestGate, setShowGuestGate] = useState(false);
     const [gateFeature, setGateFeature] = useState("");
 
-    // Mock Auth State (TODO: Replace with real auth hook)
     const isGuest = true;
+
+    // Intent Restoration
+    React.useEffect(() => {
+        const pending = sessionStorage.getItem('nexus_pending_intent');
+        if (pending && !isGuest) {
+            const data = JSON.parse(pending);
+            // If it was recently saved (e.g. within 30 mins)
+            if (Date.now() - data.timestamp < 30 * 60 * 1000) {
+                if (data.feature === "Posting") setShowListingModal(true);
+                // More features can be handled here
+            }
+            sessionStorage.removeItem('nexus_pending_intent');
+        }
+    }, [isGuest]);
 
     const handleProtectedAction = (feature: string, action: () => void) => {
         if (isGuest) {
+            // Ghost State Recovery: Save intent before gating
+            sessionStorage.setItem('nexus_pending_intent', JSON.stringify({
+                feature,
+                timestamp: Date.now()
+            }));
+
             setGateFeature(feature);
             setShowGuestGate(true);
         } else {
@@ -47,12 +66,12 @@ export function BottomFabricNav() {
                                 <button
                                     key={item.id}
                                     onClick={() => handleProtectedAction("Posting", () => setShowListingModal(true))}
-                                    className="relative -top-6"
+                                    className="flex-1 flex flex-col items-center justify-center py-2"
                                 >
-                                    <div className="h-16 w-16 rounded-full bg-gradient-to-tr from-nexus-primary to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/30 ring-4 ring-black transform transition-all active:scale-95 hover:scale-105">
-                                        <div className="absolute inset-0 rounded-full animate-ping opacity-20 bg-white" />
-                                        <Plus className="w-8 h-8 text-white" />
+                                    <div className="h-12 w-12 rounded-full bg-nexus-primary flex items-center justify-center shadow-lg transform transition-all active:scale-95 hover:scale-105">
+                                        <Plus className="w-6 h-6 text-white" />
                                     </div>
+                                    <span className="text-[10px] font-medium mt-1 text-gray-400">Sell</span>
                                 </button>
                             );
                         }

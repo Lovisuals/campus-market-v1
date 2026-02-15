@@ -223,8 +223,8 @@ export function CreateListingModal({ isOpen, onClose }: CreateListingModalProps)
                                     <span className="text-base">🕵️</span>
                                 </div>
                                 <div>
-                                    <p className="text-sm font-bold text-white">Post Anonymously</p>
-                                    <p className="text-[10px] text-gray-400">Hide your profile from other students (Paid Feature)</p>
+                                    <p className="text-sm font-bold text-white">Post Anonymously (₦500 fee)</p>
+                                    <p className="text-[10px] text-gray-400">Hide your profile from other students instantly.</p>
                                 </div>
                             </div>
                             <button
