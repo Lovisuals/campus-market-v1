@@ -47,5 +47,13 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Allow Campus Market to access your camera to take photos for your listings.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Allow Campus Market to access your gallery to upload photos of items you want to sell.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Your location is used to show you the closest marketplace listings on your campus.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
