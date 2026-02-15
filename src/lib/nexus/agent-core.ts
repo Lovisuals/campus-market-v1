@@ -20,7 +20,7 @@ export async function processUserQuery(query: string): Promise<AgentMessage> {
 
     const lowerQuery = query.toLowerCase();
 
-    let responseContent = "I'm still learning how to help with that specific request. Try asking about 'cheap food', 'laptops', or 'part-time jobs'.";
+    let responseContent = "I'm Nexus, your AI assistant. For buying/selling help, just ask! \n\nFor operational issues or direct support, please contact **Admin** at **(234) 0808 300 0771**.";
     let action = undefined;
 
     if (lowerQuery.includes('laptop') || lowerQuery.includes('macbook') || lowerQuery.includes('computer')) {
@@ -45,7 +45,7 @@ export async function processUserQuery(query: string): Promise<AgentMessage> {
             type: 'link' as const
         };
     } else if (lowerQuery.includes('hello') || lowerQuery.includes('hi')) {
-        responseContent = "Hey! I'm NEXUS, your student concierge. I can verify deals, find gigs, or help you save money. What's on your mind?";
+        responseContent = "Hey! I'm Nexus, the AI Agent for Campus Market P2P. I help you navigate deals and sales. Need human help? Call Admin at (234) 0808 300 0771.";
     }
 
     return {

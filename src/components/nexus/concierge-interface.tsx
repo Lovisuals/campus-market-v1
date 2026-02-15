@@ -43,10 +43,49 @@ export function ConciergeInterface() {
         setIsThinking(true);
 
         try {
-            const response = await processUserQuery(userMsg.content);
-            setMessages(prev => [...prev, response]);
+            // [PHASE 9] Real AI Integration
+            const response = await fetch('/api/ai/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: userMsg.content })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                // Handle Rate Limit or Error
+                const errorMsg: AgentMessage = {
+                    id: crypto.randomUUID(),
+                    role: 'agent',
+                    content: data.error || "I'm having trouble thinking right now. Please try again.",
+                    timestamp: new Date(),
+                    action: data.limitReached ? {
+                        label: "Upgrade Plan",
+                        href: "/squad", // Upsell flow
+                        type: 'link'
+                    } : undefined
+                };
+                setMessages(prev => [...prev, errorMsg]);
+                return;
+            }
+
+            const aiMsg: AgentMessage = {
+                id: crypto.randomUUID(),
+                role: 'agent',
+                content: data.response,
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, aiMsg]);
+
         } catch (error) {
-            // proper error handling would go here
+            console.error(error);
+            const errorMsg: AgentMessage = {
+                id: crypto.randomUUID(),
+                role: 'agent',
+                content: "Network error. Please check your connection.",
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, errorMsg]);
         } finally {
             setIsThinking(false);
         }

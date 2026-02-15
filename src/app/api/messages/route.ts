@@ -63,7 +63,7 @@ export async function POST(req: Request) {
     // [NEXUS SECURITY] Check for Contact Info (Phone/Email)
     const securityCheck = detectContactInfo(content);
     if (securityCheck.detected) {
-      await logSecurityEvent(user.id, 'policy_violation',
+      await logSecurityEvent(user.id, 'suspicious_activity',
         { reason: `Contact info sharing attempted: ${securityCheck.reason}` }, req);
       return NextResponse.json({
         error: securityCheck.reason

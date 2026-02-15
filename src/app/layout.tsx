@@ -13,8 +13,8 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "NEXUS | student.os",
-  description: " The intelligent lifestyle OS for students. Deals, Drops, and Discovery.",
+  title: "Campus Market P2P | Buy & Sell on Campus",
+  description: "The #1 student marketplace for buying, selling, and connecting across Nigerian campuses.",
 };
 
 const geistSans = Geist({
@@ -34,8 +34,8 @@ export default function RootLayout({
         <ErrorBoundary>
           <ThemeProvider
             attribute="class"
-            defaultTheme="dark"
-            enableSystem={false}
+            defaultTheme="system"
+            enableSystem
             disableTransitionOnChange
           >
             {/* Main Content Area - The Stream resides here */}
