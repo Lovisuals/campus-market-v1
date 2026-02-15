@@ -15,6 +15,20 @@ export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "Campus Market P2P | Buy & Sell on Campus",
   description: "The #1 student marketplace for buying, selling, and connecting across Nigerian campuses.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Campus Market",
+  },
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: "cover",
+  },
+  themeColor: "#00a884",
 };
 
 const geistSans = Geist({
