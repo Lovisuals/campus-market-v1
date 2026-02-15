@@ -94,6 +94,8 @@ export async function sendQueuedNotifications() {
         await sendEmail(notification.recipient, notification.payload);
       } else if (notification.type === 'sms' && twilioClient) {
         await sendSMS(notification.recipient, notification.payload);
+      } else if (notification.type === 'push') {
+        await sendPush(notification.recipient, notification.payload);
       }
 
       // Mark as sent
@@ -160,10 +162,15 @@ function getEmailHtml(payload: NotificationPayload): string {
 function getSMSText(payload: NotificationPayload): string {
   switch (payload.type) {
     case 'new_listing':
-      return `New listing: ${payload.title} at ${payload.campus}. Check admin panel.`;
+      return 'New Campus Market notification.';
     case 'admin_approval':
       return 'Your Campus Market listing has been approved!';
     default:
       return 'New Campus Market notification.';
   }
+}
+
+async function sendPush(recipient: string, payload: NotificationPayload) {
+  // TODO: Integrate Firebase Admin / OneSignal / Pusher to send native push to mobile device
+  console.log(`Sending Native Push to Recipient ${recipient}:`, payload);
 }

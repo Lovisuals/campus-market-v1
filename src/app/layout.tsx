@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BottomFabricNav } from "@/components/layout/bottom-fabric-nav";
 import { Toaster } from "@/components/ui/toaster";
+import { MobileBridge } from "@/components/mobile/mobile-bridge";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -60,7 +61,7 @@ export default function RootLayout({
             {/* NEXUS Bottom Fabric Navigation */}
             <BottomFabricNav />
             <Toaster />
-
+            <MobileBridge />
           </ThemeProvider>
         </ErrorBoundary>
       </body>
