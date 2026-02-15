@@ -24,9 +24,9 @@ export function GuestGateModal({ isOpen, onClose, featureName = "this feature" }
             <div className="relative w-full max-w-sm bg-nexus-dark border border-white/10 rounded-3xl p-8 text-center shadow-2xl animate-in fade-in zoom-in-95">
                 <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 p-2 bg-white/5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white"
+                    className="absolute top-2 right-2 p-3 bg-white/10 rounded-full hover:bg-nexus-primary/20 text-white/50 hover:text-white transition-all z-10"
                 >
-                    <X className="w-5 h-5" />
+                    <X className="w-6 h-6" />
                 </button>
 
                 <div className="w-20 h-20 rounded-full bg-nexus-dark border-2 border-white/10 mx-auto mb-6 flex items-center justify-center relative">

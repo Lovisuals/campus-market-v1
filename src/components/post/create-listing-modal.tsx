@@ -68,26 +68,45 @@ export function CreateListingModal({ isOpen, onClose }: CreateListingModalProps)
 
             // 2. Handle Payment for Anonymous Posts
             if (isAnonymous) {
-                toast({ title: "Redirecting...", description: "Initiating Paystack Secure Payment..." });
+                toast({ title: "Opening Payment...", description: "Please complete the secure payment to post anonymously." });
 
                 const payRes = await fetch('/api/payments/initialize', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        email: "user@example.com", // Should be user's email
-                        amount: 500, // ₦500
+                        email: "student@campusmarket.com.ng", // Placeholder or fetch real email
+                        amount: 500,
                         purpose: 'anonymous_post_fee',
-                        listing_id: result.listing.id // Link Payment to Listing
+                        listing_id: result.listing.id
                     })
                 });
 
                 const payData = await payRes.json();
 
-                if (payData.authorization_url) {
+                if (payData.access_code) {
+                    const handler = (window as any).PaystackPop.setup({
+                        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY,
+                        email: "student@campusmarket.com.ng",
+                        amount: 500 * 100, // in kobo
+                        access_code: payData.access_code,
+                        callback: function (response: any) {
+                            toast({ title: "Payment Success!", description: "Your anonymous post is now live." });
+                            onClose();
+                            window.location.reload(); // Refresh to show new post
+                        },
+                        onClose: function () {
+                            toast({ title: "Payment Cancelled", description: "Listing saved as draft (Hidden).", variant: "destructive" });
+                            setIsSubmitting(false);
+                        }
+                    });
+                    handler.openIframe();
+                    return;
+                } else if (payData.authorization_url) {
+                    // Fallback to redirect if popup fails
                     window.location.href = payData.authorization_url;
-                    return; // Stop execution, redirecting
+                    return;
                 } else {
-                    throw new Error("Payment init failed");
+                    throw new Error("Payment initialization failed");
                 }
             }
 
@@ -117,9 +136,9 @@ export function CreateListingModal({ isOpen, onClose }: CreateListingModalProps)
             <div className="relative w-full max-w-md bg-nexus-dark border border-white/10 rounded-3xl p-6 shadow-2xl animate-in fade-in zoom-in-95">
                 <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 p-2 bg-white/5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white"
+                    className="absolute top-2 right-2 p-3 bg-white/10 rounded-full hover:bg-nexus-primary/20 text-white/50 hover:text-white transition-all z-10"
                 >
-                    <X className="w-5 h-5" />
+                    <X className="w-6 h-6" />
                 </button>
 
                 <h2 className="text-2xl font-black text-white mb-1">Create Listing</h2>

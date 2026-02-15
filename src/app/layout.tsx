@@ -6,6 +6,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BottomFabricNav } from "@/components/layout/bottom-fabric-nav";
 import { Toaster } from "@/components/ui/toaster";
 import { MobileBridge } from "@/components/mobile/mobile-bridge";
+import Script from "next/script";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -46,6 +47,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={geistSans.variable} suppressHydrationWarning>
       <body className="bg-nexus-dark text-gray-100 antialiased min-h-screen flex flex-col pb-24 selection:bg-nexus-primary selection:text-white">
+        <Script src="https://js.paystack.co/v1/inline.js" strategy="afterInteractive" />
         <ErrorBoundary>
           <ThemeProvider
             attribute="class"
