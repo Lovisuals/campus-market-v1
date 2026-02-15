@@ -124,7 +124,7 @@ export default function LoginPage() {
                 {isRecognized ? "Device Recognized!" : "Check your email!"}
               </h2>
               <p className="text-gray-600 text-sm">
-                We've sent a magic link to <strong>{displayEmail}</strong>
+                We&apos;ve sent a magic link to <strong>{displayEmail}</strong>
               </p>
               <p className="text-gray-500 text-xs italic">
                 {isRecognized
@@ -204,7 +204,7 @@ export default function LoginPage() {
           {/* Sign Up Link */}
           <div className="text-center">
             <p className="text-gray-600 text-sm mb-3">
-              Don't have an account?
+              Don&apos;t have an account?
             </p>
             <Link
               href="/register"

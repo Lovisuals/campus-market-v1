@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 interface SiteAlert {
     id: string;
     message: string;
+    is_active: boolean;
     color_theme: "teal" | "red" | "gold" | "blue";
     link_url?: string;
 }
@@ -44,7 +45,7 @@ export default function LiveTicker() {
                     } else {
                         const newAlert = payload.new as SiteAlert;
                         // Check if it's active
-                        if ((payload.new as any).is_active) {
+                        if ((payload.new as SiteAlert).is_active) {
                             setAlert(newAlert);
                         } else {
                             setAlert(null);

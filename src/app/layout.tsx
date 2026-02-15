@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
-import Link from "next/link";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BottomFabricNav } from "@/components/layout/bottom-fabric-nav";
 import { Toaster } from "@/components/ui/toaster";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 interface SiteAlert {
@@ -13,7 +13,6 @@ interface SiteAlert {
 
 export default function AlertManager() {
     const [alerts, setAlerts] = useState<SiteAlert[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [newAlert, setNewAlert] = useState({
         message: "",
@@ -23,12 +22,7 @@ export default function AlertManager() {
 
     const supabase = createClient();
 
-    useEffect(() => {
-        fetchAlerts();
-    }, []);
-
-    const fetchAlerts = async () => {
-        setIsLoading(true);
+    const fetchAlerts = useCallback(async () => {
         const { data, error } = await supabase
             .from("site_alerts")
             .select("*")
@@ -37,8 +31,11 @@ export default function AlertManager() {
         if (!error && data) {
             setAlerts(data);
         }
-        setIsLoading(false);
-    };
+    }, [supabase]);
+
+    useEffect(() => {
+        fetchAlerts();
+    }, [fetchAlerts]);
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
