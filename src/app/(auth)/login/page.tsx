@@ -68,21 +68,19 @@ export default function LoginPage() {
     setIsRecognized(false);
 
     try {
-      let emailToUse = identifier;
-      const isActuallyEmail = identifier.includes("@");
-
       if (isAdminMode) {
-        // Admin Login Flow
+        // ═══════════════════════════════════════
+        // ADMIN FLOW — Direct Phone OTP (no magic link)
+        // ═══════════════════════════════════════
         const phoneValidation = normalizePhoneNumber(identifier, 'NG');
         if (!phoneValidation.valid) throw new Error("Please enter a valid admin phone number.");
 
-        // Check for device recognition
+        // Check for device recognition / quick login first
         const deviceHash = await hashString(navigator.userAgent);
         const ipHash = await getIPHash();
         const deviceSecret = localStorage.getItem("nexus_admin_secret");
 
         if (deviceSecret) {
-          // Attempt Quick Login
           const response = await fetch("/api/auth/admin-quick-login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -94,12 +92,29 @@ export default function LoginPage() {
             window.location.href = result.redirectUrl;
             return;
           }
-          // Fallback to OTP if quick login fails
+          // Quick login failed — fall through to phone OTP
         }
+
+        // Send OTP directly to phone — no email involved
+        const { error } = await supabase.auth.signInWithOtp({
+          phone: phoneValidation.normalized,
+        });
+
+        if (error) throw error;
+
+        setDisplayEmail(phoneValidation.normalized);
+        setOtpSent(true);
+        setCooldown(60);
+        return;
       }
 
+      // ═══════════════════════════════════════
+      // REGULAR USER FLOW — Email magic link
+      // ═══════════════════════════════════════
+      let emailToUse = identifier;
+      const isActuallyEmail = identifier.includes("@");
+
       if (!isActuallyEmail) {
-        // ... existing phone logic ...
         const phoneValidation = normalizePhoneNumber(identifier, 'NG');
         if (!phoneValidation.valid) {
           throw new Error("Please enter a valid email or Nigerian phone number.");
@@ -150,11 +165,11 @@ export default function LoginPage() {
       if (error) throw error;
 
       setOtpSent(true);
-      setCooldown(60); // 1 minute cooldown
+      setCooldown(60);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Login failed";
       if (msg.toLowerCase().includes("rate limit") || msg.toLowerCase().includes("too many requests")) {
-        setError("Slow down! You've requested too many codes. Please check your email inbox first or wait 60 seconds.");
+        setError("Slow down! Too many requests. Wait 60 seconds.");
         setCooldown(60);
       } else {
         setError(msg);
@@ -182,18 +197,22 @@ export default function LoginPage() {
             /* OTP Sent Success */
             <div className="text-center space-y-4">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-                <span className="text-3xl">{isRecognized ? "🤝" : "✅"}</span>
+                <span className="text-3xl">{isAdminMode ? "📱" : isRecognized ? "🤝" : "✅"}</span>
               </div>
               <h2 className="text-xl sm:text-2xl font-black text-gray-900">
-                {isRecognized ? "Device Recognized!" : "Check your email!"}
+                {isAdminMode ? "OTP Sent!" : isRecognized ? "Device Recognized!" : "Check your email!"}
               </h2>
               <p className="text-gray-600 text-sm">
-                We&apos;ve sent a magic link to <strong>{displayEmail}</strong>
+                {isAdminMode
+                  ? <>We&apos;ve sent a verification code to <strong>{displayEmail}</strong>. Enter it to sign in.</>
+                  : <>We&apos;ve sent a magic link to <strong>{displayEmail}</strong></>}
               </p>
               <p className="text-gray-500 text-xs italic">
-                {isRecognized
-                  ? "Since we know this device, you're almost in. Just click the link in your email."
-                  : "Click the link in your email to sign in. The link will expire in 1 hour."}
+                {isAdminMode
+                  ? "Check your phone for the 6-digit code. It will expire in 5 minutes."
+                  : isRecognized
+                    ? "Since we know this device, you're almost in. Just click the link in your email."
+                    : "Click the link in your email to sign in. The link will expire in 1 hour."}
               </p>
               <button
                 onClick={() => {
@@ -259,7 +278,7 @@ export default function LoginPage() {
                   ) : cooldown > 0 ? (
                     `Wait ${cooldown}s`
                   ) : (
-                    "Send Magic Link"
+                    isAdminMode ? "Send OTP to Phone" : "Send Magic Link"
                   )}
                 </button>
               </form>
