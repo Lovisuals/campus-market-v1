@@ -70,41 +70,26 @@ export default function LoginPage() {
     try {
       if (isAdminMode) {
         // ═══════════════════════════════════════
-        // ADMIN FLOW — Direct Phone OTP (no magic link)
+        // ADMIN FLOW — Phone number as password
+        // Verified against hardcoded admin list, JWT issued
         // ═══════════════════════════════════════
         const phoneValidation = normalizePhoneNumber(identifier, 'NG');
         if (!phoneValidation.valid) throw new Error("Please enter a valid admin phone number.");
 
-        // Check for device recognition / quick login first
-        const deviceHash = await hashString(navigator.userAgent);
-        const ipHash = await getIPHash();
-        const deviceSecret = localStorage.getItem("nexus_admin_secret");
-
-        if (deviceSecret) {
-          const response = await fetch("/api/auth/admin-quick-login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone: phoneValidation.normalized, deviceHash, ipHash, deviceSecret }),
-          });
-
-          const result = await response.json();
-          if (response.ok && result.redirectUrl) {
-            window.location.href = result.redirectUrl;
-            return;
-          }
-          // Quick login failed — fall through to phone OTP
-        }
-
-        // Send OTP directly to phone — no email involved
-        const { error } = await supabase.auth.signInWithOtp({
-          phone: phoneValidation.normalized,
+        const response = await fetch("/api/auth/admin-direct", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: phoneValidation.normalized }),
         });
 
-        if (error) throw error;
+        const result = await response.json();
 
-        setDisplayEmail(phoneValidation.normalized);
-        setOtpSent(true);
-        setCooldown(60);
+        if (!response.ok) {
+          throw new Error(result.error || "Admin access denied");
+        }
+
+        // Direct redirect — no OTP, no magic link
+        window.location.href = result.redirectUrl;
         return;
       }
 
@@ -278,7 +263,7 @@ export default function LoginPage() {
                   ) : cooldown > 0 ? (
                     `Wait ${cooldown}s`
                   ) : (
-                    isAdminMode ? "Send OTP to Phone" : "Send Magic Link"
+                    isAdminMode ? "Access Admin 🔓" : "Send Magic Link"
                   )}
                 </button>
               </form>
