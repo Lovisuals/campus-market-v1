@@ -24,10 +24,10 @@ export async function POST(request: NextRequest) {
 
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     // Store OTP in session/database (simplified for now - in production use database)
     // For now, we'll use Supabase's built-in email OTP instead
-    
+
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -88,7 +88,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'OTP sent successfully',
-      otp: otp, // In production, don't return this - store in database
     });
 
   } catch (error) {

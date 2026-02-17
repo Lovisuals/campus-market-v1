@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/client';
 import crypto from 'crypto';
 
 /**
@@ -76,9 +75,9 @@ export async function receiveFundsToEscrow(
   transactionId: string,
   buyerId: string,
   amount: number,
-  paymentRef: string
+  paymentRef: string,
+  supabase: any
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = createClient();
 
   // Verify transaction integrity first
   const integrityCheck = await verifyTransactionIntegrity(transactionId, supabase);
@@ -163,9 +162,9 @@ export async function receiveFundsToEscrow(
 export async function releaseFundsFromEscrow(
   escrowId: string,
   adminId: string,
-  confirmationProof: string
+  confirmationProof: string,
+  supabase: any
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = createClient();
 
   const { data: escrow, error: escrowError } = await supabase
     .from('escrow_accounts')
@@ -204,7 +203,7 @@ export async function releaseFundsFromEscrow(
     escrow.transaction_id,
     supabase
   );
-  
+
   if (!integrityCheck.valid) {
     await logEscrowAction(
       'ESCROW_RELEASE_INTEGRITY_FAILURE',

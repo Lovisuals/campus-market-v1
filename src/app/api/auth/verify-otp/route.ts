@@ -31,11 +31,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify OTP
+    const supabase = await createClient();
     const result = await verifyOtp(
       validated.userId,
       validated.code,
       validated.deviceFingerprint,
-      ip
+      ip,
+      supabase
     );
 
     if (!result.valid) {
@@ -46,7 +48,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Update user as verified
-    const supabase = await createClient();
     const { error: updateError } = await supabase
       .from('users')
       .update({

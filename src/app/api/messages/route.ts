@@ -79,7 +79,11 @@ export async function POST(req: Request) {
     }
 
     // Encrypt message content
-    const encryptionKey = process.env.MESSAGE_ENCRYPTION_KEY || 'default-key-change-in-production-32chars';
+    const encryptionKey = process.env.MESSAGE_ENCRYPTION_KEY;
+    if (!encryptionKey) {
+      console.error('MESSAGE_ENCRYPTION_KEY is not configured');
+      return NextResponse.json({ error: 'Messaging service unavailable' }, { status: 503 });
+    }
     const { ciphertext, iv, authTag } = await encryptMessage(content, encryptionKey);
 
     // Insert message

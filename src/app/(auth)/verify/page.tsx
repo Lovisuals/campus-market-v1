@@ -113,7 +113,7 @@ function VerifyPageContent() {
               </p>
             </div>
 
-              {error && (
+            {error && (
               <div className="p-4 bg-red-50 border-2 border-red-200 rounded-2xl">
                 <p className="text-red-700 text-sm font-semibold">❌ {error}</p>
               </div>
@@ -132,7 +132,20 @@ function VerifyPageContent() {
           <div className="text-center">
             <p className="text-xs text-gray-500">
               Didn't receive a code?{" "}
-              <button className="text-wa-teal font-bold hover:underline">
+              <button
+                className="text-wa-teal font-bold hover:underline"
+                onClick={async () => {
+                  try {
+                    setError(null);
+                    const { error: resendError } = await supabase.auth.signInWithOtp({ phone: phoneNumber });
+                    if (resendError) setError(resendError.message);
+                    else setError(null);
+                    alert("OTP resent! Check your phone.");
+                  } catch (err) {
+                    setError("Failed to resend OTP");
+                  }
+                }}
+              >
                 Resend OTP
               </button>
             </p>

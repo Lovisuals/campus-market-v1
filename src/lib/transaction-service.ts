@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/client';
 import crypto from 'crypto';
 
 export interface Transaction {
@@ -26,9 +25,9 @@ export async function initiateTransaction(
   sellerId: string,
   listingId: string,
   amount: number,
-  paymentMethod: string = 'paystack'
+  paymentMethod: string = 'paystack',
+  supabase: any
 ): Promise<{ transactionId: string; error?: string }> {
-  const supabase = createClient();
 
   const adminFee = amount * 0.05; // 5% admin commission
   const sellerAmount = amount - adminFee;
@@ -60,8 +59,7 @@ export async function initiateTransaction(
 /**
  * Move funds to escrow after successful payment
  */
-export async function holdFundsInEscrow(transactionId: string): Promise<{ success: boolean; error?: string }> {
-  const supabase = createClient();
+export async function holdFundsInEscrow(transactionId: string, supabase: any): Promise<{ success: boolean; error?: string }> {
 
   const { data: transaction, error: fetchError } = await supabase
     .from('transactions')
@@ -105,9 +103,9 @@ export async function holdFundsInEscrow(transactionId: string): Promise<{ succes
  */
 export async function confirmDelivery(
   transactionId: string,
-  buyerId: string
+  buyerId: string,
+  supabase: any
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = createClient();
 
   const { data: transaction, error: fetchError } = await supabase
     .from('transactions')
@@ -165,9 +163,9 @@ export async function confirmDelivery(
 export async function refundTransaction(
   transactionId: string,
   reason: string,
-  authorizedBy: string
+  authorizedBy: string,
+  supabase: any
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = createClient();
 
   const { data: transaction, error: fetchError } = await supabase
     .from('transactions')
@@ -204,7 +202,7 @@ export async function refundTransaction(
   }
 
   // Log refund audit trail
-  await supabase.from('audit_log').insert({
+  await supabase.from('audit_logs').insert({
     action: 'refund_processed',
     entity_type: 'transaction',
     entity_id: transactionId,
@@ -222,9 +220,9 @@ export async function refundTransaction(
 export async function openDispute(
   transactionId: string,
   userId: string,
-  reason: string
+  reason: string,
+  supabase: any
 ): Promise<{ disputeId: string; error?: string }> {
-  const supabase = createClient();
 
   const { data: transaction, error: fetchError } = await supabase
     .from('transactions')
@@ -269,8 +267,7 @@ export async function openDispute(
 /**
  * Get transaction history for user
  */
-export async function getTransactionHistory(userId: string, limit: number = 20) {
-  const supabase = createClient();
+export async function getTransactionHistory(userId: string, limit: number = 20, supabase: any) {
 
   const { data: transactions, error } = await supabase
     .from('transactions')
@@ -294,8 +291,7 @@ export async function getTransactionHistory(userId: string, limit: number = 20) 
 /**
  * Calculate admin revenue from commission
  */
-export async function getAdminRevenue(startDate: Date, endDate: Date) {
-  const supabase = createClient();
+export async function getAdminRevenue(startDate: Date, endDate: Date, supabase: any) {
 
   const { data: transactions, error } = await supabase
     .from('transactions')
@@ -316,8 +312,7 @@ export async function getAdminRevenue(startDate: Date, endDate: Date) {
 /**
  * Generate transaction receipt
  */
-export async function generateReceipt(transactionId: string) {
-  const supabase = createClient();
+export async function generateReceipt(transactionId: string, supabase: any) {
 
   const { data: transaction, error } = await supabase
     .from('transactions')

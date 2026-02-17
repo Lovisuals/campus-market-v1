@@ -97,7 +97,7 @@ export default function CompleteProfilePage() {
           phone: phoneValidation.normalized,
           full_name: fullName,
           campus: campus,
-          phone_verified: true,
+          phone_verified: false,
           updated_at: new Date().toISOString(),
         })
         .eq("id", user.id);

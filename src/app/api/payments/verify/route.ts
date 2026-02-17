@@ -41,7 +41,7 @@ export async function GET(req: Request) {
         if (metadata?.listing_id) {
             await supabase
                 .from('listings')
-                .update({ status: 'active' }) // From 'pending_payment'
+                .update({ status: 'pending_approval' }) // Maintain admin approval flow
                 .eq('id', metadata.listing_id);
         }
 

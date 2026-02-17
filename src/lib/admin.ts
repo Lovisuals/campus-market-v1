@@ -4,7 +4,7 @@
  */
 export const HARDCODED_ADMIN_EMAILS = [
     "mail.lovisuals@gmail.com",
-    "vitalbytesventures@gmial.com",
+    "vitalbytesventures@gmail.com",
     "olawalopeyemi18@gmail.com"
 ];
 

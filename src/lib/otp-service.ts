@@ -1,7 +1,4 @@
 import crypto from 'crypto';
-import { createClient } from '@/lib/supabase/client';
-
-const supabase = createClient();
 
 interface OtpRecord {
   code: string;
@@ -15,7 +12,8 @@ interface OtpRecord {
 export async function generateOtp(
   userId: string,
   deviceFingerprint: string,
-  ipAddress: string
+  ipAddress: string,
+  supabase: any
 ): Promise<{ code: string; expiresIn: number }> {
   const code = crypto.randomInt(100000, 999999).toString();
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
@@ -45,7 +43,8 @@ export async function verifyOtp(
   userId: string,
   code: string,
   deviceFingerprint: string,
-  ipAddress: string
+  ipAddress: string,
+  supabase: any
 ): Promise<{ valid: boolean; error?: string }> {
   const deviceHash = crypto.createHash('sha256').update(deviceFingerprint).digest('hex');
   const ipHash = crypto.createHash('sha256').update(ipAddress).digest('hex');

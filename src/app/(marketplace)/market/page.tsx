@@ -61,7 +61,8 @@ export default function MarketPage() {
     };
 
     fetchListings();
-  }, [activeCampus, searchQuery, viewMode, supabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCampus, searchQuery, viewMode]);
 
   // Mock broadcasts data (in production, fetch from Supabase)
   useEffect(() => {
@@ -126,7 +127,7 @@ export default function MarketPage() {
   };
 
   const goToAdminPanel = () => {
-    router.push("/dashboard");
+    router.push("/admin");
   };
 
   return (

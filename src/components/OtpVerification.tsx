@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { captureDeviceInfo, generateDeviceFingerprint } from '@/lib/device-fingerprint';
-import { verifyOtp } from '@/lib/otp-service';
 
 export function OtpVerification({ userId }: { userId: string }) {
   const [code, setCode] = useState('');
@@ -31,13 +30,19 @@ export function OtpVerification({ userId }: { userId: string }) {
       .then(r => r.json())
       .then(d => d.ip);
 
-    const result = await verifyOtp(userId, code, fingerprint, ip);
+    const res = await fetch('/api/auth/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, code, deviceFingerprint: fingerprint, ipAddress: ip })
+    });
 
-    if (result.valid) {
+    const result = await res.json();
+
+    if (res.ok) {
       localStorage.setItem('otp_verified', 'true');
-      window.location.href = '/dashboard';
+      window.location.href = '/market';
     } else {
-      alert(result.error);
+      alert(result.error || 'Verification failed');
     }
 
     setLoading(false);

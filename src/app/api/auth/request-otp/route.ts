@@ -78,7 +78,8 @@ export async function POST(request: NextRequest) {
     const { code, expiresIn } = await generateOtp(
       validated.userId,
       validated.deviceFingerprint,
-      ip
+      ip,
+      supabase
     );
 
     // Send OTP via Resend email
