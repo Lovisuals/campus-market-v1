@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
 import AlertManager from "@/components/admin/alert-manager";
@@ -38,8 +38,9 @@ interface User {
   created_at: string;
 }
 
-export default function AdminDashboard() {
+function AdminDashboardInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -59,24 +60,40 @@ export default function AdminDashboard() {
     const checkAdminAndFetch = async () => {
       setIsLoading(true);
       try {
-        // Check if user is admin
+        let authorized = false;
+
+        // === PATH A: Supabase session auth (email users) ===
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user?.id) {
-          router.push("/login");
-          return;
+        if (session?.user?.id) {
+          const { data: userData, error: userError } = await supabase
+            .from("users")
+            .select("is_admin, email, phone")
+            .eq("id", session.user.id)
+            .single();
+
+          authorized = !userError && checkIsAdmin(userData?.email, userData?.phone, userData?.is_admin);
         }
 
-        // Fetch user role
-        const { data: userData, error: userError } = await supabase
-          .from("users")
-          .select("is_admin, email, phone")
-          .eq("id", session.user.id)
-          .single();
+        // === PATH B: JWT token auth (phone admin) ===
+        if (!authorized) {
+          const adminToken = searchParams.get("admin_token");
+          if (adminToken) {
+            try {
+              const res = await fetch("/api/auth/verify-admin-token", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token: adminToken }),
+              });
+              const payload = await res.json();
+              if (res.ok && payload.is_admin) {
+                authorized = true;
+              }
+            } catch { /* token invalid */ }
+          }
+        }
 
-        const hardcodedAdmin = checkIsAdmin(userData?.email, userData?.phone, userData?.is_admin);
-
-        if (userError || !hardcodedAdmin) {
-          router.push("/market");
+        if (!authorized) {
+          router.push("/login");
           return;
         }
 
@@ -130,7 +147,8 @@ export default function AdminDashboard() {
     };
 
     checkAdminAndFetch();
-  }, [router, supabase]);
+  }, [router, supabase, searchParams]);
+
 
   const handleApproveVerification = async (requestId: string, sellerId: string) => {
     try {
@@ -669,5 +687,20 @@ export default function AdminDashboard() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function AdminDashboard() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white dark:bg-[#111b21] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-wa-teal border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    }>
+      <AdminDashboardInner />
+    </Suspense>
   );
 }

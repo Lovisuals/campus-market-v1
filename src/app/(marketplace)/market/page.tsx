@@ -247,15 +247,31 @@ export default function MarketPage() {
             {listings.map((listing) => (
               <div
                 key={listing.id}
-                className={`bg-white dark:bg-[#202c33] rounded-lg overflow-hidden border transition-all ${listing.is_verified
+                onClick={() => router.push(`/product/${listing.id}`)}
+                className={`bg-white dark:bg-[#202c33] rounded-lg overflow-hidden border transition-all cursor-pointer ${listing.is_verified
                   ? "border-green-400 dark:border-green-500 shadow-lg shadow-green-200 dark:shadow-green-900"
                   : "border-gray-100 dark:border-[#2a3942]"
-                  } hover:shadow-md`}
+                  } hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]`}
               >
+                {/* Product Image */}
+                {listing.images && listing.images.length > 0 ? (
+                  <div className="w-full h-40 bg-gray-100 dark:bg-[#1a252c] relative overflow-hidden">
+                    <img
+                      src={listing.images[0].startsWith("http") ? listing.images[0] : `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/listing-images/${listing.images[0]}`}
+                      alt={listing.title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-full h-40 bg-gray-100 dark:bg-[#1a252c] flex items-center justify-center">
+                    <span className="text-4xl">📦</span>
+                  </div>
+                )}
+
                 <div className="p-4 space-y-3">
                   {/* Verification Badge */}
                   <div
-                    onClick={() => router.push(`/profile?id=${listing.seller_id}`)}
+                    onClick={(e) => { e.stopPropagation(); router.push(`/profile?id=${listing.seller_id}`); }}
                     className="cursor-pointer hover:opacity-80 flex items-center gap-2 mb-2"
                   >
                     <div className="w-8 h-8 rounded-full bg-wa-teal flex items-center justify-center text-sm">👤</div>
@@ -285,14 +301,14 @@ export default function MarketPage() {
                   </p>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => handleBuyClick(listing)}
-                      className="flex-1 py-2 bg-wa-teal text-white rounded-lg font-bold text-sm hover:bg-[#075e54] transition-colors"
+                      onClick={(e) => { e.stopPropagation(); router.push(`/product/${listing.id}`); }}
+                      className="flex-1 py-2.5 bg-wa-teal text-white rounded-lg font-bold text-sm hover:bg-[#075e54] transition-colors active:scale-95"
                     >
-                      Contact
+                      View Details →
                     </button>
                     {viewMode === "requests" && (
                       <button
-                        onClick={() => handleFulfillRequest(listing)}
+                        onClick={(e) => { e.stopPropagation(); handleFulfillRequest(listing); }}
                         className="flex-1 py-2 bg-[#8E44AD] text-white rounded-lg font-bold text-sm hover:bg-[#7a3a96] transition-colors"
                       >
                         Fulfill

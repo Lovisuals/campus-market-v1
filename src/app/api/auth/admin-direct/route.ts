@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             success: true,
             token,
-            redirectUrl: `/admin/god-mode?key=${token}`,
+            redirectUrl: `/dashboard?admin_token=${token}`,
         });
 
     } catch (error: any) {
