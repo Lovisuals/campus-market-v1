@@ -51,12 +51,27 @@ function ChatsPageInner() {
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
+      let userId: string | null = null;
+
+      // Path A: Supabase session
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) {
+      if (session?.user?.id) {
+        userId = session.user.id;
+      }
+
+      // Path B: Admin JWT from localStorage
+      if (!userId) {
+        const { getAdminUser } = await import("@/lib/admin-auth");
+        const adminUser = getAdminUser();
+        if (adminUser?.is_admin) {
+          userId = adminUser.id;
+        }
+      }
+
+      if (!userId) {
         router.push("/login");
         return;
       }
-      const userId = session.user.id;
       setCurrentUserId(userId);
 
       // Fetch all chats where user is buyer or seller
@@ -381,8 +396,8 @@ function ChatsPageInner() {
                 <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
                   <div
                     className={`max-w-[80%] px-4 py-2.5 rounded-2xl ${isMine
-                        ? "bg-[#005c4b] text-white rounded-br-md"
-                        : "bg-white dark:bg-[#202c33] text-gray-900 dark:text-white rounded-bl-md border border-gray-100 dark:border-gray-700"
+                      ? "bg-[#005c4b] text-white rounded-br-md"
+                      : "bg-white dark:bg-[#202c33] text-gray-900 dark:text-white rounded-bl-md border border-gray-100 dark:border-gray-700"
                       }`}
                   >
                     <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>

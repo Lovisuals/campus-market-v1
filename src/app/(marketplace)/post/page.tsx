@@ -106,18 +106,32 @@ export default function PostListingPage() {
         throw new Error("Maximum 3 images allowed");
       }
 
+      // Get user ID from Supabase session OR admin localStorage
+      let currentUserId: string | null = null;
+      let isAdminUser = false;
+
       const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session?.user?.id) {
-        throw new Error("Not authenticated");
+      if (sessionData?.session?.user?.id) {
+        currentUserId = sessionData.session.user.id;
+        const { data: userRow } = await supabase
+          .from("users")
+          .select("is_admin")
+          .eq("id", currentUserId)
+          .single();
+        isAdminUser = !!userRow?.is_admin;
+      } else {
+        // Fallback: admin JWT auth
+        const { getAdminUser } = await import("@/lib/admin-auth");
+        const adminUser = getAdminUser();
+        if (adminUser?.is_admin) {
+          currentUserId = adminUser.id;
+          isAdminUser = true;
+        }
       }
 
-      // Check if current user is admin to auto-verify
-      const { data: userRow } = await supabase
-        .from("users")
-        .select("is_admin")
-        .eq("id", sessionData.session.user.id)
-        .single();
-      const isAdminUser = !!userRow?.is_admin;
+      if (!currentUserId) {
+        throw new Error("Not authenticated");
+      }
 
       let imageUrls: string[] = [];
       let imagePaths: string[] = [];
@@ -126,12 +140,11 @@ export default function PostListingPage() {
       if (images.length > 0) {
         setIsUploading(true);
         const bucket = "listing-images";
-        const userId = sessionData.session.user.id;
         const timestamp = Date.now();
-        
+
         for (let i = 0; i < images.length; i++) {
           const file = images[i];
-          const filename = `${userId}/${timestamp}-${i}-${file.name}`;
+          const filename = `${currentUserId}/${timestamp}-${i}-${file.name}`;
 
           const { data, error: uploadError } = await supabase.storage
             .from(bucket)
@@ -160,7 +173,10 @@ export default function PostListingPage() {
 
       const res = await fetch("/api/listings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(isAdminUser ? { "Authorization": `Bearer ${(await import("@/lib/admin-auth")).getAdminToken()}` } : {}),
+        },
         body: JSON.stringify(payload),
       });
 
@@ -185,19 +201,29 @@ export default function PostListingPage() {
         return;
       }
 
+      // Get user ID from session or admin auth
+      let userId: string | null = null;
       const { data: sessionData } = await supabase.auth.getSession();
-      const { data: userData } = await supabase
+      if (sessionData?.session?.user?.id) {
+        userId = sessionData.session.user.id;
+      } else {
+        const { getAdminUser } = await import("@/lib/admin-auth");
+        const adminUser = getAdminUser();
+        if (adminUser?.is_admin) userId = adminUser.id;
+      }
+
+      const { data: userData } = userId ? await supabase
         .from("users")
         .select("full_name, email")
-        .eq("id", sessionData.session?.user?.id)
-        .single();
+        .eq("id", userId)
+        .single() : { data: null };
 
       const { error: verifyError } = await supabase
         .from("verification_requests")
         .insert([
           {
-            seller_id: sessionData.session?.user?.id,
-            seller_name: userData?.full_name || "Unknown",
+            seller_id: userId,
+            seller_name: userData?.full_name || "Admin",
             seller_email: userData?.email || "",
             reason: verificationReason,
             status: "pending",

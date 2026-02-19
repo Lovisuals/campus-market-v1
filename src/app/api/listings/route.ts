@@ -51,12 +51,33 @@ export async function POST(req: Request) {
 
     const supabase = await createServerClient();
 
-    // Validate session
+    // Validate session — support both Supabase auth and admin JWT
+    let userId: string | null = null;
+    let isAdminUser = false;
+
     const {
       data: { session },
     } = await supabase.auth.getSession();
 
-    if (!session?.user?.id) {
+    if (session?.user?.id) {
+      userId = session.user.id;
+    } else {
+      // Fallback: check for admin JWT in Authorization header or cookie
+      const authHeader = req.headers.get("authorization");
+      const token = authHeader?.replace("Bearer ", "");
+      if (token) {
+        try {
+          const { verifyMagicToken } = await import("@/lib/jwt");
+          const payload = await verifyMagicToken(token);
+          if (payload?.is_admin) {
+            userId = `admin-${(payload.phone as string || "").replace(/\+/g, "")}`;
+            isAdminUser = true;
+          }
+        } catch { /* invalid token */ }
+      }
+    }
+
+    if (!userId) {
       const response = NextResponse.json({ error: "Not authenticated" }, { status: 401 });
       return addSecurityHeaders(response);
     }
@@ -66,16 +87,18 @@ export async function POST(req: Request) {
 
     // Rate limiting by user ID and IP
     try {
-      await listingRateLimiter.consume(session.user.id);
+      await listingRateLimiter.consume(userId);
       await listingRateLimiterByIP.consume(ip);
     } catch (rejRes) {
       return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
     }
 
-    // Check phone_verified from users table
-    const { data: userRow } = await supabase.from("users").select("phone_verified").eq("id", session.user.id).single();
-    if (!userRow?.phone_verified) {
-      return NextResponse.json({ error: "Phone not verified" }, { status: 403 });
+    // Admin bypasses phone verification check
+    if (!isAdminUser) {
+      const { data: userRow } = await supabase.from("users").select("phone_verified").eq("id", userId).single();
+      if (!userRow?.phone_verified) {
+        return NextResponse.json({ error: "Phone not verified" }, { status: 403 });
+      }
     }
 
     // Abuse protection: Check for duplicate titles by same user in last 24 hours
@@ -83,7 +106,7 @@ export async function POST(req: Request) {
     const { data: recentListings } = await supabase
       .from('listings')
       .select('title')
-      .eq('seller_id', session.user.id)
+      .eq('seller_id', userId)
       .gte('created_at', oneDayAgo);
 
     if (recentListings?.some(listing => listing.title.toLowerCase() === title.toLowerCase())) {
@@ -115,14 +138,13 @@ export async function POST(req: Request) {
       }
     }
 
-    // Check if user is admin
-    const { data: adminUserRow } = await supabase.from("users").select("is_admin, email, phone").eq("id", session.user.id).single();
-    const isAdminUser = checkIsAdmin(adminUserRow?.email, adminUserRow?.phone, !!adminUserRow?.is_admin);
+    // Admin posts are auto-verified
+    const listingIsVerified = isAdminUser || checkIsAdmin(null, null, false);
 
     // Insert listing - require admin approval (NOT auto-approved)
     const { data: inserted, error: insertError } = await supabase.from("listings").insert([
       {
-        seller_id: session.user.id,
+        seller_id: userId,
         title: sanitizeInput(title),
         description: sanitizeInput(description),
         category: sanitizeInput(category),
@@ -132,7 +154,7 @@ export async function POST(req: Request) {
         condition: sanitizeInput(condition),
         is_request: isRequest,
         is_approved: false,
-        is_verified: isAdminUser,
+        is_verified: listingIsVerified,
         status: "pending_approval",
         views: 0,
         saved_count: 0,

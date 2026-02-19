@@ -88,6 +88,14 @@ export default function LoginPage() {
           throw new Error(result.error || "Admin access denied");
         }
 
+        // Store admin auth in localStorage for access across all pages
+        const { storeAdminAuth } = await import("@/lib/admin-auth");
+        storeAdminAuth(result.token, {
+          id: `admin-${phoneValidation.normalized.replace(/\+/g, "")}`,
+          phone: phoneValidation.normalized,
+          is_admin: true,
+        });
+
         // Direct redirect — no OTP, no magic link
         window.location.href = result.redirectUrl;
         return;
